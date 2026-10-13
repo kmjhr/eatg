@@ -252,7 +252,14 @@
 
     // 第1步：启动即初始化数据层（建库/建表/种子），失败提示但不阻断骨架渲染
     if (EATG.storage && EATG.storage.initDB) {
-      EATG.storage.initDB().catch(function (err) {
+      EATG.storage.initDB().then(function () {
+        // 启动提醒检查（开订/出荷/补款三类，免打扰时段不弹）
+        if (EATG.reminder && EATG.reminder.checkAll) {
+          EATG.reminder.checkAll().catch(function (e) {
+            console.warn('[EATG] 提醒检查失败:', e);
+          });
+        }
+      }).catch(function (err) {
         console.error('[EATG] initDB 失败:', err);
         var msg = '数据层初始化失败：' + (err && err.message || err) + '。请检查浏览器是否禁用了 IndexedDB 或无痕模式数据存储。';
         if (EATG.ui && EATG.ui.toast) EATG.ui.toast(msg, 'error');

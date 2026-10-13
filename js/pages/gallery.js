@@ -8,6 +8,7 @@
         4 自动点亮：关联 goods 任一购入 on_hand → owned（覆盖手动值）；预售/在途 → 半亮
         5 条目点击：详情 + “去收藏库补录”（预填角色跳新增页）+ 手动切换拥有
         6 点亮动画 300ms（grayscale→color）
+        7 刷卡模式：卡片堆叠 + 左右翻卡（右滑标记拥有 / 左滑跳过，惯性甩出 + 弹簧回弹 + 上一步撤销）
    口径：三态判定见 computeItemState；金额无关。
    ========================================================================== */
 (function (global) {
@@ -44,8 +45,10 @@
       purchasesByGoods: {},
       currentCharId: null,
       search: '',
-      groupBySeries: true
+      groupBySeries: true,
+      swipeMode: false
     };
+    resetDeck();
   }
 
   // ---- 三态判定（《业务规则》§9 唯一口径）----
@@ -108,6 +111,54 @@
     return state.characters.filter(function (c) { return c.id === state.currentCharId; })[0] || null;
   }
 
+  // ---- 谷子库 → 图鉴 自动同步（《业务规则》§9 扩展）----
+  // 谷子库中存在且关联了当前角色的谷子，若图鉴无同名条目则自动添加并关联 goods_id，
+  // 拥有状态由 computeItemState 按谷子购入状态自动判定（现货→点亮，预售/在途→半亮）。
+  // 只添加不存在的条目，不覆盖既有标记。
+  function syncFromGoods() {
+    var c = currentChar();
+    if (!c) return Promise.resolve(0);
+    return S.getAll('goods').then(function (goods) {
+      return S.getAll('gallery_items').then(function (items) {
+        var byName = {};
+        items.forEach(function (it) {
+          if (it.character_id === c.id) byName[String(it.name || '')] = true;
+        });
+        var toAdd = [];
+        goods.forEach(function (g) {
+          var cids = g.character_ids || [];
+          var hit = false;
+          for (var i = 0; i < cids.length; i++) {
+            if (Number(cids[i]) === c.id) { hit = true; break; }
+          }
+          if (!hit) return;
+          var nm = String(g.name || '').trim();
+          if (!nm || byName[nm]) return;
+          byName[nm] = true;
+          toAdd.push({
+            character_id: c.id,
+            name: g.name,
+            goods_type: String(g.goods_type || '').trim() || '',
+            image: (g.images && g.images[0]) ? g.images[0] : '',
+            goods_id: g.id,
+            owned: false,
+            series: '',
+            release_date: ''
+          });
+        });
+        if (!toAdd.length) return Promise.resolve(0);
+        var i = 0;
+        function next() {
+          if (i >= toAdd.length) return Promise.resolve(toAdd.length);
+          var batch = toAdd.slice(i, i + 50);
+          i += 50;
+          return Promise.all(batch.map(function (v) { return S.add('gallery_items', v); })).then(next);
+        }
+        return next();
+      });
+    });
+  }
+
   // ---- 进度 ----
   function progress(items) {
     var owned = 0, total = items.length;
@@ -116,6 +167,277 @@
       if (st.state === 'owned') owned++;
     });
     return { owned: owned, total: total, pct: total ? Math.round(owned / total * 100) : 0 };
+  }
+
+  // ---- 刷卡模式（卡片堆叠 · 左右翻卡）----
+  // 手感参数：跟手位移 + 轻微旋转缩放，超阈值出现印章提示；
+  // 松手时按甩动速度或位移判定方向，惯性飞出；不足阈值则弹簧回弹。
+  var SWIPE_CFG = {
+    threshold: 0.32,   // 位移达卡片宽度比例即判定翻卡
+    flingV: 0.45,      // 甩动速度阈值（px/ms）
+    maxRot: 22,        // 最大旋转角（deg）
+    rubber: 0.35,      // 超界橡皮筋阻力系数
+    maxVisible: 3      // 堆叠可见层数（含顶层）
+  };
+  var deck = null;
+
+  function resetDeck() {
+    deck = { items: [], pos: 0, history: [], top: null, locked: false, drag: null, suppressTap: false };
+  }
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  function deckCardHTML(it, layer) {
+    var st = computeItemState(it);
+    var img = it.image ? 'background-image:url(' + esc(it.image) + ')' : '';
+    var badge = '';
+    if (st.state === 'owned') badge = '<span class="gal-badge gal-badge--owned">拥有</span>';
+    else if (st.state === 'half') badge = '<span class="gal-badge gal-badge--' + st.status + '">' + esc(STATUS_LABELS[st.status] || st.status) + '</span>';
+    var nameCls = st.state === 'none' ? 'gal-deck-name is-muted' : 'gal-deck-name';
+    return '<div class="gal-deck-card gal-card--' + st.state + (layer === 0 ? ' is-top' : '') + '" data-iid="' + it.id + '">' +
+      '<div class="gal-deck-img" style="' + img + '">' + badge +
+        '<div class="gal-deck-stamp gal-deck-stamp--yes">拥有</div>' +
+        '<div class="gal-deck-stamp gal-deck-stamp--no">跳过</div>' +
+      '</div>' +
+      '<div class="' + nameCls + '">' + esc(it.name) + '</div>' +
+      (it.series ? '<div class="gal-deck-series">' + esc(it.series) + '</div>' : '') +
+    '</div>';
+  }
+
+  function deckEmptyHTML(total) {
+    if (!total) {
+      return '<div class="gal-deck-empty">' +
+        '<div class="gal-deck-empty-title">还没有图鉴条目</div>' +
+      '</div>';
+    }
+    return '<div class="gal-deck-empty">' +
+      '<div class="gal-deck-empty-title">这叠卡片刷完了</div>' +
+      '<button type="button" class="btn btn--secondary" id="gal-deck-restart">重新开始</button>' +
+    '</div>';
+  }
+
+  function rebuildDeck() {
+    var deckEl = document.getElementById('gal-deck');
+    if (!deckEl) return;
+    deck.top = null;
+    deckEl.innerHTML = '';
+    if (deck.pos >= deck.items.length) {
+      deckEl.innerHTML = deckEmptyHTML(deck.items.length);
+      updateSwipeCount();
+      return;
+    }
+    var end = Math.min(deck.items.length, deck.pos + SWIPE_CFG.maxVisible);
+    for (var i = deck.pos; i < end; i++) {
+      var layer = i - deck.pos; // 0 = 顶层
+      var it = deck.items[i];
+      var wrap = document.createElement('div');
+      wrap.innerHTML = deckCardHTML(it, layer);
+      var card = wrap.firstChild;
+      card.style.zIndex = 10 - layer;
+      if (layer === 0) {
+        deck.top = card;
+      } else {
+        card.style.transform = 'translateY(' + (layer * 12) + 'px) scale(' + (1 - layer * 0.07) + ') rotate(' + (layer % 2 ? 1.6 : -1.6) + 'deg)';
+        card.style.opacity = 1 - layer * 0.16;
+        card.style.pointerEvents = 'none';
+      }
+      deckEl.appendChild(card);
+    }
+    updateSwipeCount();
+  }
+
+  function updateSwipeCount() {
+    var el = document.getElementById('gal-swipe-count');
+    if (!el) return;
+    var total = deck.items.length;
+    if (total === 0) { el.textContent = '共 0 张'; return; }
+    el.innerHTML = deck.pos >= total
+      ? '刷完了 · 共 <span class="num">' + total + '</span> 张'
+      : '第 <span class="num">' + (deck.pos + 1) + '</span> / ' + total + ' 张';
+  }
+
+  // 数据变更后局部刷新顶部拥有进度（不整页重渲染，避免打断刷卡动画）
+  function updateProgUI() {
+    var page = document.getElementById('gallery-page');
+    if (!page) return;
+    var pr = progress(currentItems());
+    var cnt = page.querySelector('.gal-prog-count');
+    if (cnt) cnt.innerHTML = '<span class="num">' + pr.owned + '</span> / ' + pr.total + ' 已拥有';
+    var fill = page.querySelector('.gal-prog-fill');
+    if (fill) fill.style.width = pr.pct + '%';
+  }
+
+  // ---- 手势 ----
+  function bindDeckGestures() {
+    var deckEl = document.getElementById('gal-deck');
+    if (!deckEl) return;
+    on(deckEl, 'pointerdown', onDeckDown);
+  }
+
+  function onDeckDown(e) {
+    if (deck.locked || !deck.top) return;
+    if (e.button && e.button !== 0) return;
+    var card = e.target.closest('.gal-deck-card');
+    if (!card || card !== deck.top) return;
+    deck.drag = {
+      startX: e.clientX, startY: e.clientY,
+      dx: 0, moved: false, dragging: false,
+      samples: []
+    };
+    document.addEventListener('pointermove', onDeckMove);
+    document.addEventListener('pointerup', onDeckUp);
+    document.addEventListener('pointercancel', onDeckUp);
+  }
+
+  function cancelDeckDrag() {
+    document.removeEventListener('pointermove', onDeckMove);
+    document.removeEventListener('pointerup', onDeckUp);
+    document.removeEventListener('pointercancel', onDeckUp);
+    deck.drag = null;
+  }
+
+  function onDeckMove(e) {
+    var d = deck.drag;
+    if (!d) return;
+    var dx = e.clientX - d.startX, dy = e.clientY - d.startY;
+    if (!d.dragging) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      d.moved = true;
+      if (Math.abs(dy) > Math.abs(dx) * 1.2) { cancelDeckDrag(); return; } // 纵向意图 → 交还页面滚动
+      d.dragging = true;
+      deck.top.style.transition = 'none';
+      deck.top.style.cursor = 'grabbing';
+    }
+    d.dx = dx;
+    var w = deck.top.offsetWidth || 320;
+    var max = Math.max(100, w * SWIPE_CFG.threshold * 1.6);
+    var tx = rubberX(dx, max);
+    var rot = clamp(dx * 0.14, -SWIPE_CFG.maxRot, SWIPE_CFG.maxRot);
+    var scale = 1 - Math.min(Math.abs(dx) / (w * 0.85), 1) * 0.08;
+    deck.top.style.transform = 'translate3d(' + tx + 'px,0,0) rotate(' + rot + 'deg) scale(' + scale + ')';
+    updateStamps(dx, w);
+    var now = Date.now();
+    d.samples.push([now, dx]);
+    if (d.samples.length > 6) d.samples.shift();
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function rubberX(dx, max) {
+    var a = Math.abs(dx);
+    if (a <= max) return dx;
+    return (dx > 0 ? 1 : -1) * (max + (a - max) * SWIPE_CFG.rubber);
+  }
+
+  function updateStamps(dx, w) {
+    var yes = deck.top.querySelector('.gal-deck-stamp--yes');
+    var no = deck.top.querySelector('.gal-deck-stamp--no');
+    if (!yes || !no) return;
+    var th = Math.max(90, w * SWIPE_CFG.threshold);
+    var k = clamp(Math.abs(dx) / th, 0, 1);
+    yes.style.opacity = dx > 0 ? k : 0;
+    no.style.opacity = dx < 0 ? k : 0;
+  }
+
+  function flingVX(d) {
+    var s = d.samples;
+    if (s.length < 2) return 0;
+    var a = s[s.length - 1], b = s[0];
+    var dt = a[0] - b[0];
+    if (dt <= 0) return 0;
+    return (a[1] - b[1]) / dt;
+  }
+
+  function onDeckUp() {
+    var d = deck.drag;
+    cancelDeckDrag();
+    if (!deck.top) return;
+    if (!d || !d.dragging) return; // 未拖动 → 交给 click 处理（详情）
+    if (d.dragging) {
+      deck.suppressTap = true;
+      setTimeout(function () { deck.suppressTap = false; }, 400);
+    }
+    var vx = flingVX(d);
+    var w = deck.top.offsetWidth || 320;
+    var th = Math.max(90, w * SWIPE_CFG.threshold);
+    var dir = 0;
+    if (Math.abs(vx) >= SWIPE_CFG.flingV) dir = vx > 0 ? 1 : -1;
+    else if (Math.abs(d.dx) >= th) dir = d.dx > 0 ? 1 : -1;
+    if (dir) flyOut(dir);
+    else springBack();
+  }
+
+  function springBack() {
+    var card = deck.top;
+    if (!card) return;
+    card.style.transition = 'transform .5s cubic-bezier(.18,1.25,.4,1)';
+    card.style.transform = '';
+    card.style.cursor = 'grab';
+    var stamps = card.querySelectorAll('.gal-deck-stamp');
+    for (var i = 0; i < stamps.length; i++) stamps[i].style.opacity = 0;
+    setTimeout(function () { if (card) card.style.transition = ''; }, 520);
+  }
+
+  function flyOut(dir) {
+    var card = deck.top;
+    if (!card) return;
+    deck.locked = true;
+    var w = card.offsetWidth || 320;
+    card.style.transition = 'transform .34s cubic-bezier(.4,0,.6,1), opacity .3s ease';
+    card.style.transform = 'translate3d(' + (dir * w * 1.35) + 'px,' + (dir * w * 0.06) + 'px,0) rotate(' + (dir * 24) + 'deg) scale(.9)';
+    card.style.opacity = 0;
+    setTimeout(function () { advanceDeck(dir); }, 330);
+  }
+
+  function advanceDeck(dir) {
+    deck.locked = false;
+    var item = deck.items[deck.pos];
+    var changed = false, prevOwned = false;
+    if (item) {
+      prevOwned = !!item.owned;
+      if (dir > 0) {
+        var st = computeItemState(item);
+        if (st.state === 'none') {          // 右滑 = 标记拥有（仅未拥有时）
+          item.owned = true;
+          S.put('gallery_items', item).then(function () {});
+          changed = true;
+        }
+      }
+      deck.history.push({ iid: item.id, changed: changed, prevOwned: prevOwned });
+    }
+    deck.pos++;
+    if (changed) {
+      updateProgUI();
+      UI.toast('已标记拥有', 'success');
+    }
+    rebuildDeck();
+  }
+
+  // 上一步：回退一张牌（含还原标记）
+  function undoSwipe() {
+    if (deck.locked) return;
+    if (!deck.history.length || deck.pos <= 0) { UI.toast('没有可撤销的刷卡'); return; }
+    var last = deck.history.pop();
+    deck.pos--;
+    if (last.changed) {
+      for (var i = 0; i < state.items.length; i++) {
+        if (state.items[i].id === last.iid) {
+          state.items[i].owned = last.prevOwned;
+          S.put('gallery_items', state.items[i]).then(function () {});
+          break;
+        }
+      }
+      updateProgUI();
+      UI.toast('已撤销，标记已还原', 'success');
+    } else {
+      UI.toast('已撤销上一步', 'success');
+    }
+    rebuildDeck();
+  }
+
+  // 底部按钮直接触发翻卡
+  function actionSwipe(dir) {
+    if (deck.locked || !deck.top) return;
+    flyOut(dir);
   }
 
   // ---- 渲染 ----
@@ -204,6 +526,27 @@
     return '<div class="gal-toolbar">' +
       '<input id="gal-search" class="input" type="text" placeholder="搜索条目名称" value="' + esc(state.search) + '">' +
       '<button type="button" class="btn btn--secondary" id="gal-group-btn">' + (state.groupBySeries ? '取消分组' : '按系列分组') + '</button>' +
+      '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
+    '</div>';
+  }
+
+  function swipePageHTML() {
+    return '<div class="page-scroll" id="gallery-page">' +
+      charScrollHTML() +
+      progressHTML() +
+      '<div class="gal-swipe">' +
+        '<div class="gal-swipe-head">' +
+          '<button type="button" class="btn btn--secondary btn--sm" id="gal-swipe-exit">‹ 网格</button>' +
+          '<div class="gal-swipe-count" id="gal-swipe-count"></div>' +
+        '</div>' +
+        '<div class="gal-deck" id="gal-deck"></div>' +
+        '<div class="gal-swipe-tip">左滑跳过 · 右滑标记拥有 · 点击卡片看详情</div>' +
+        '<div class="gal-swipe-actions">' +
+          '<button type="button" class="btn btn--secondary" id="gal-swipe-skip">‹ 跳过</button>' +
+          '<button type="button" class="btn btn--secondary" id="gal-swipe-undo">上一步</button>' +
+          '<button type="button" class="btn btn--primary" id="gal-swipe-own">拥有 ›</button>' +
+        '</div>' +
+      '</div>' +
     '</div>';
   }
 
@@ -300,7 +643,15 @@
   function rerender() {
     var page = document.getElementById('gallery-page');
     if (!page) return;
-    page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML();
+    if (state.swipeMode) {
+      page.innerHTML = swipePageHTML();
+      deck.items = currentItems();
+      deck.pos = 0;
+      deck.history = [];
+      rebuildDeck();
+    } else {
+      page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML();
+    }
     bindInner();
   }
 
@@ -315,16 +666,49 @@
       var chip = e.target.closest('.gal-char-chip');
       if (chip) { state.currentCharId = Number(chip.dataset.cid); rerender(); }
     });
+    if (state.swipeMode) {
+      bindSwipeControls(page);
+      bindDeckGestures();
+      return;
+    }
     var search = document.getElementById('gal-search');
     if (search) on(search, 'input', function () { state.search = search.value; rerender(); });
     var gb = document.getElementById('gal-group-btn');
     if (gb) on(gb, 'click', function () { state.groupBySeries = !state.groupBySeries; rerender(); });
+    var swBtn = document.getElementById('gal-swipe-btn');
+    if (swBtn) on(swBtn, 'click', function () {
+      if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
+      state.swipeMode = true;
+      rerender();
+    });
     on(page, 'click', function (e) {
       var card = e.target.closest('.gal-card');
       if (card) {
         var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
         if (it) openDetail(it);
       }
+    });
+  }
+
+  // ---- 刷卡模式：顶部控制条 + 底部按钮 + 点击详情 ----
+  function bindSwipeControls(page) {
+    on(page, 'click', function (e) {
+      if (e.target.closest('.gal-deck-stamp')) return;
+      var btn = e.target.closest('button[id]');
+      if (btn) {
+        var id = btn.id;
+        if (id === 'gal-swipe-exit') { state.swipeMode = false; rerender(); }
+        else if (id === 'gal-swipe-skip') actionSwipe(-1);
+        else if (id === 'gal-swipe-own') actionSwipe(1);
+        else if (id === 'gal-swipe-undo') undoSwipe();
+        else if (id === 'gal-deck-restart') { deck.pos = 0; deck.history = []; rebuildDeck(); }
+        return;
+      }
+      if (deck.suppressTap || deck.locked) return;
+      var card = e.target.closest('.gal-deck-card');
+      if (!card || card !== deck.top) return;
+      var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
+      if (it) openDetail(it);
     });
   }
 
@@ -335,9 +719,14 @@
     ctx.setTitle('图鉴');
     ctx.setBack(false);
     ctx.setActiveTab('gallery');
-    ctx.navActions.innerHTML = '<button id="gal-add-char" type="button" class="icon-btn icon-btn--accent" title="添加角色">＋</button><button id="gal-add-item" type="button" class="icon-btn" title="添加图鉴条目">＋</button>';
+    ctx.navActions.innerHTML = '<button id="gal-import" type="button" class="icon-btn" title="导入图鉴清单 / 检查更新">导</button><button id="gal-add-char" type="button" class="icon-btn icon-btn--accent" title="添加角色">＋</button><button id="gal-add-item" type="button" class="icon-btn" title="添加图鉴条目">＋</button>';
     var addChar = document.getElementById('gal-add-char');
     var addItem = document.getElementById('gal-add-item');
+    var importBtn = document.getElementById('gal-import');
+    if (importBtn) on(importBtn, 'click', function () {
+      if (!EATG.galleryImport) { UI.toast('导入模块未加载', 'error'); return; }
+      EATG.galleryImport.open({ reload: reload });
+    });
     if (addChar) on(addChar, 'click', openAddChar);
     if (addItem) on(addItem, 'click', function () {
       if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
@@ -347,6 +736,13 @@
       if (state.destroyed) return;
       container.innerHTML = pageHTML();
       bindInner();
+      // 谷子库 → 图鉴 自动同步（打开图鉴页即执行，幂等）
+      syncFromGoods().then(function (n) {
+        if (n && !state.destroyed) {
+          UI.toast('已从谷子库自动添加 ' + n + ' 条图鉴', 'success');
+          rerender();
+        }
+      });
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 图鉴加载失败', err);
@@ -356,6 +752,7 @@
 
   function unmount() {
     if (state) state.destroyed = true;
+    if (deck && deck.drag) cancelDeckDrag();
     clearOffs();
   }
 

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3D6DF5" />
+  <meta name="description" content="一咕（EATG）· 个人谷子收藏管理工具（纯本地离线，数据仅存本机）" />
+  <title>一咕（EATG）</title>
+  <link rel="stylesheet" href="css/main.css?v=18" />
+  <script>
+    // 提前应用主题，避免白屏闪烁（P-03）
+    (function () {
+      try {
+        var t = localStorage.getItem('eatg_theme') || 'auto';
+        if (t === 'auto') {
+          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div id="app" class="app">
+
+    <!-- 顶部导航容器 -->
+    <header id="top-nav" class="top-nav" role="banner">
+      <button id="nav-back" class="nav-back" type="button" hidden aria-label="返回">‹</button>
+      <h1 id="nav-title" class="nav-title">一咕（EATG）</h1>
+      <div id="nav-actions" class="nav-actions"></div>
+    </header>
+
+    <!-- 页面容器：各 hash 路由的 section 在此渲染 -->
+    <main id="page-container" class="page-container" role="main">
+      <!-- 首屏骨架屏（加载态演示，首屏渲染后移除） -->
+      <section id="boot-skeleton" class="page" aria-hidden="true">
+        <div class="skeleton skeleton-bar" style="width:38%;height:22px"></div>
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-thumb"></div>
+          <div class="skeleton-lines">
+            <div class="skeleton skeleton-line" style="width:70%"></div>
+            <div class="skeleton skeleton-line" style="width:45%"></div>
+            <div class="skeleton skeleton-line" style="width:60%"></div>
+          </div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-thumb"></div>
+          <div class="skeleton-lines">
+            <div class="skeleton skeleton-line" style="width:62%"></div>
+            <div class="skeleton skeleton-line" style="width:38%"></div>
+            <div class="skeleton skeleton-line" style="width:52%"></div>
+          </div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-thumb"></div>
+          <div class="skeleton-lines">
+            <div class="skeleton skeleton-line" style="width:74%"></div>
+            <div class="skeleton skeleton-line" style="width:41%"></div>
+            <div class="skeleton skeleton-line" style="width:55%"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部 Tab 栏（5 项，顺序：收藏库/图鉴/行情/资讯/我的） -->
+    <nav id="tab-bar" class="tab-bar" role="tablist" aria-label="主导航">
+      <a class="tab-item" href="#/library" data-route="library" role="tab" aria-selected="false">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 5a2 2 0 0 1 2-2h11v18H6a2 2 0 0 1-2-2z" />
+          <path d="M9 3v18" />
+        </svg>
+        <span class="tab-label">收藏库</span>
+      </a>
+      <a class="tab-item" href="#/gallery" data-route="gallery" role="tab" aria-selected="false">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+        <span class="tab-label">图鉴</span>
+      </a>
+      <a class="tab-item" href="#/market" data-route="market" role="tab" aria-selected="false">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 17l5-5 4 4 9-9" />
+          <path d="M21 11V7h-4" />
+        </svg>
+        <span class="tab-label">行情</span>
+      </a>
+      <a class="tab-item" href="#/news" data-route="news" role="tab" aria-selected="false">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 5h13v14H5a1 1 0 0 1-1-1z" />
+          <path d="M17 8h3v9a1 1 0 0 1-1 1h-2" />
+          <path d="M7 8h6" />
+          <path d="M7 12h6" />
+          <path d="M7 16h4" />
+        </svg>
+        <span class="tab-label">资讯</span>
+      </a>
+      <a class="tab-item" href="#/mine" data-route="mine" role="tab" aria-selected="false">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" />
+        </svg>
+        <span class="tab-label">我的</span>
+      </a>
+    </nav>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <!-- 弹窗容器（确认/表单弹窗挂载点） -->
+    <div id="modal-root" class="modal-root" hidden></div>
+  </div>
+
+  <script src="js/utils.js?v=17"></script>
+  <script src="js/storage.js?v=17"></script>
+  <script src="js/ui.js?v=17"></script>
+  <script src="js/agg.js?v=17"></script>
+  <script src="js/pages/library.js?v=17"></script>
+  <script src="js/pages/goods_edit.js?v=17"></script>
+  <script src="js/pages/goods_detail.js?v=17"></script>
+  <script src="js/pages/orders.js?v=17"></script>
+  <script src="js/pages/order_edit.js?v=17"></script>
+  <script src="js/pages/sales.js?v=17"></script>
+  <script src="js/pages/sale_edit.js?v=17"></script>
+  <script src="js/pages/stats.js?v=17"></script>
+  <script src="js/pages/gallery.js?v=17"></script>
+  <script src="js/pages/gallery_edit.js?v=17"></script>
+  <script src="js/pages/market.js?v=17"></script>
+  <script src="js/pages/market_detail.js?v=17"></script>
+  <script src="js/pages/market_edit.js?v=17"></script>
+  <script src="js/pages/news.js?v=17"></script>
+  <script src="js/pages/news_edit.js?v=17"></script>
+  <script src="js/pages/sources.js?v=17"></script>
+  <script src="js/pages/wishlist.js?v=17"></script>
+  <script src="js/pages/mine.js?v=17"></script>
+  <script src="js/pages/settings.js?v=17"></script>
+  <script src="js/pages/data.js?v=17"></script>
+  <script src="js/pages/about.js?v=17"></script>
+  <script src="js/app.js?v=17"></script>
+</body>
+</html>

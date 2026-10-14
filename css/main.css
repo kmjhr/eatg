@@ -1857,3 +1857,9 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .cat-sel{flex:0 0 96px;height:32px;font-size:13px}
 /* 数据管理页 小分区标题 */
 .dm-block-title{margin:18px 0 8px;padding-left:10px;border-left:3px solid #f6c64b;font-size:14px;font-weight:600;color:var(--text,#1a1a1a)}
+/* 图鉴品类筛选 chips */
+.gal-cat-filter{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;-webkit-overflow-scrolling:touch}
+.gal-cat-filter::-webkit-scrollbar{display:none}
+.gal-cat-chip{flex:0 0 auto;padding:4px 12px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:transparent;font-size:12px;color:var(--text,#1a1a1a);white-space:nowrap;cursor:pointer}
+[data-theme="dark"] .gal-cat-chip{border-color:rgba(255,255,255,.22);color:#eee}
+.gal-cat-chip.is-on{background:#f6c64b;border-color:#f6c64b;color:#1a1a1a;font-weight:600}

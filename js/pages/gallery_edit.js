@@ -72,6 +72,14 @@
     return opts;
   }
 
+  function catOpts() {
+    var cur = String(state.item.category || '');
+    var list = [['', '未填写（归入其他）'], ['吧唧', '吧唧'], ['纸片', '纸片'], ['立牌', '立牌'], ['毛绒', '毛绒'], ['其他', '其他']];
+    return list.map(function (pair) {
+      return '<option value="' + pair[0] + '"' + (cur === pair[0] ? ' selected' : '') + '>' + pair[1] + '</option>';
+    }).join('');
+  }
+
   function pageHTML() {
     var it = state.item;
     return '<div class="page-scroll" id="ge-page">' +
@@ -82,6 +90,9 @@
           '<input id="ge-name" class="input" type="text" value="' + esc(it.name) + '" placeholder="官方谷子名"></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">系列</label></div>' +
           '<input id="ge-series" class="input" type="text" value="' + esc(it.series) + '"></div>' +
+        '<div class="field"><div class="field-head"><label class="field-label">品类</label></div>' +
+          '<select id="ge-cat" class="input">' + catOpts() + '</select>' +
+          '<p class="hint">未填写默认归入「其他」，图鉴页可按品类筛选</p></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">发售日期</label></div>' +
           '<input id="ge-date" class="input" type="date" value="' + esc(it.release_date) + '"></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
@@ -111,6 +122,7 @@
     dom.char = p.querySelector('#ge-char');
     dom.name = p.querySelector('#ge-name');
     dom.series = p.querySelector('#ge-series');
+    dom.cat = p.querySelector('#ge-cat');
     dom.date = p.querySelector('#ge-date');
     dom.goods = p.querySelector('#ge-goods');
     dom.owned = p.querySelector('#ge-owned');
@@ -147,6 +159,7 @@
     it.character_id = Number(dom.char.value) || null;
     it.name = dom.name.value.trim();
     it.series = dom.series.value.trim();
+    it.category = (dom.cat ? dom.cat.value : '') || '';
     it.release_date = dom.date.value || '';
     it.goods_id = dom.goods.value ? Number(dom.goods.value) : null;
     it.owned = dom.owned.checked;

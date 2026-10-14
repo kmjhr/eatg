@@ -57,16 +57,8 @@
     { key: 'condition', label: '品相' }
   ];
 
-  // 图鉴五大品类（固定顺序）+ 默认类型→品类映射（与 gallery.js 保持一致）
+  // 图鉴五大品类（固定顺序，条目显式填写，未填写视为「其他」）
   var CATS = ['吧唧', '纸片', '立牌', '毛绒', '其他'];
-  var DEFAULT_TYPE_CAT = {
-    '徽章（吧唧）': '吧唧', '徽章': '吧唧', '吧唧': '吧唧', '亚克力徽章': '吧唧',
-    '罐徽章': '吧唧', '马口铁徽章': '吧唧', '金属徽章': '吧唧',
-    '色纸': '纸片', '拍立得': '纸片', '生写': '纸片', '卡片': '纸片', '卡牌': '纸片',
-    '明信片': '纸片', '贴纸': '纸片', '票根': '纸片',
-    '立牌': '立牌', '亚克力立牌': '立牌', '面板亚克力立牌': '立牌', '迷你亚克力立牌': '立牌',
-    '毛绒': '毛绒', '娃娃': '毛绒', 'ぬいぐるみ': '毛绒', '毛绒挂件': '毛绒', '毛绒玩偶': '毛绒'
-  };
 
   // 快捷词（与谷子编辑页共用 localStorage: eatg_quick_words）
   var QUICK_KEY = 'eatg_quick_words';
@@ -89,8 +81,7 @@
       enums: {},
       quickWords: {},
       characters: [],
-      galleryItems: [],
-      typeCatMap: {}
+      galleryItems: []
     };
     EXPORT_DIMS.forEach(function (d) { state.dims[d.key] = true; });
   }
@@ -101,8 +92,7 @@
       S.getSetting('auto_backup_remind'),
       S.getAll('enums'),
       S.getAll('characters'),
-      S.getAll('gallery_items'),
-      S.getSetting('gallery_type_cat_map')
+      S.getAll('gallery_items')
     ]).then(function (r) {
       state.last_backup_at = r[0] || null;
       state.auto_backup_remind = r[1] || S.SETTINGS_DEFAULTS.auto_backup_remind;
@@ -112,12 +102,6 @@
       state.quickWords = loadQuickWordsMerged();
       state.characters = r[3] || [];
       state.galleryItems = r[4] || [];
-      state.typeCatMap = {};
-      for (var k in DEFAULT_TYPE_CAT) state.typeCatMap[k] = DEFAULT_TYPE_CAT[k];
-      var saved = r[5];
-      if (saved && typeof saved === 'object') {
-        for (var k2 in saved) state.typeCatMap[k2] = saved[k2];
-      }
     });
   }
 
@@ -536,46 +520,49 @@
     });
   }
 
-  /** 品类映射区：把谷子类型归入图鉴五大品类 */
+  /** 条目品类区：给每个图鉴条目填写五大品类（未填写=其他） */
   function catHTML() {
-    var seen = {}, types = [];
-    (state.galleryItems || []).forEach(function (it) {
-      var t = String(it.goods_type || '').trim();
-      if (t && !seen[t]) { seen[t] = true; types.push(t); }
-    });
-    for (var k in DEFAULT_TYPE_CAT) {
-      if (!seen[k]) { seen[k] = true; types.push(k); }
-    }
-    types.sort();
-    var rows = types.map(function (t) {
-      var cur = state.typeCatMap[t] || '其他';
-      return '<div class="cat-row"><span class="cat-name">' + esc(t) + '</span>' +
-        '<select class="input cat-sel" data-type="' + esc(t) + '">' +
-        CATS.map(function (c) { return '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
-        '</select></div>';
+    var items = state.galleryItems || [];
+    var rows = items.map(function (it, i) {
+      var cur = String(it.category || '');
+      var ch = null;
+      var chars = state.characters || [];
+      for (var j = 0; j < chars.length; j++) {
+        if (chars[j].id === it.character_id) { ch = chars[j]; break; }
+      }
+      return '<div class="cat-row"><span class="cat-name">' + esc(it.name || '(未命名)') +
+        (ch ? ' <i class="dm-chip-tag">' + esc(ch.name) + '</i>' : '') + '</span>' +
+        '<select class="input cat-sel" data-i="' + i + '">' + catOpts(cur) + '</select></div>';
     }).join('');
     return '<div class="dm-section">' +
-      '<div class="dm-section-title">品类映射</div>' +
-      '<p class="dm-note">把谷子类型归入图鉴五大品类（吧唧/纸片/立牌/毛绒/其他），按品类分组时生效；未列出的类型默认归「其他」。</p>' +
-      '<div class="dm-group">' + (rows || '<span class="muted">暂无类型</span>') +
-        '<div class="dm-actions"><button type="button" class="btn btn--primary" data-act="save-cat">保存品类映射</button></div>' +
+      '<div class="dm-section-title">条目品类</div>' +
+      '<p class="dm-note">给每个图鉴条目填写品类（吧唧/纸片/立牌/毛绒/其他），未填写视为「其他」；图鉴页可按品类筛选、按品类分组。</p>' +
+      '<div class="dm-group">' + (rows || '<span class="muted">暂无图鉴条目</span>') +
+        '<div class="dm-actions"><button type="button" class="btn btn--primary" data-act="save-cat">保存品类（共 ' + items.length + ' 条）</button></div>' +
       '</div>' +
     '</div>';
   }
+  function catOpts(cur) {
+    var list = [['', '未填写（其他）'], ['吧唧', '吧唧'], ['纸片', '纸片'], ['立牌', '立牌'], ['毛绒', '毛绒'], ['其他', '其他']];
+    return list.map(function (pair) {
+      return '<option value="' + pair[0] + '"' + (cur === pair[0] ? ' selected' : '') + '>' + pair[1] + '</option>';
+    }).join('');
+  }
   function saveCat() {
-    var map = {};
     var sels = document.querySelectorAll('.cat-sel');
-    for (var i = 0; i < sels.length; i++) map[sels[i].dataset.type] = sels[i].value;
-    S.setSetting('gallery_type_cat_map', map).then(function () {
-      state.typeCatMap = {};
-      for (var k2 in DEFAULT_TYPE_CAT) state.typeCatMap[k2] = DEFAULT_TYPE_CAT[k2];
-      for (var k3 in map) state.typeCatMap[k3] = map[k3];
-      UI.toast('品类映射已保存', 'success');
-      rerender();
-    }).catch(function (err) {
-      console.error('[EATG] 品类映射保存失败', err);
-      UI.toast('保存失败', 'error');
-    });
+    if (!sels.length) { UI.toast('暂无条目可保存', 'info'); return; }
+    var p = Promise.resolve();
+    for (var i = 0; i < sels.length; i++) {
+      (function (i) {
+        var it = state.galleryItems[i];
+        if (!it) return;
+        var v = sels[i].value;
+        it.category = v || '';
+        p = p.then(function () { return S.put('gallery_items', it); });
+      })(i);
+    }
+    p.then(function () { UI.toast('已保存 ' + sels.length + ' 条品类', 'success'); rerender(); })
+      .catch(function (err) { console.error('[EATG] 品类保存失败', err); UI.toast('保存失败', 'error'); });
   }
 
   function quickHTML() {

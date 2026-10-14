@@ -524,19 +524,19 @@
     });
   }
 
-  /** 品类选项区：管理图鉴品类的选项本身（可增、可删、可编辑），默认五大类 */
+  /** 品类选项区：管理图鉴品类的选项本身（可增、可删、可编辑），默认五大类；与「图鉴人物」同款 chip 格式 */
   function catMgrHTML() {
     var cats = state.galleryCats.length ? state.galleryCats : EATG.DEFAULT_GALLERY_CATS;
-    var rows = cats.map(function (c, i) {
-      return '<div class="cat-row">' +
-        '<span class="cat-name">' + esc(c) + '</span>' +
-        '<button type="button" class="btn btn--sm" data-act="edit-cat" data-i="' + i + '">编辑</button>' +
-        '<button type="button" class="btn btn--sm btn--danger" data-act="del-cat" data-i="' + i + '">删除</button></div>';
+    var chips = cats.map(function (c, i) {
+      return '<span class="dm-chip">' +
+        '<button type="button" class="dm-chip-word" data-act="edit-cat" data-i="' + i + '">' + esc(c) + '</button>' +
+        '<button type="button" class="dm-chip-x" data-act="del-cat" data-i="' + i + '">×</button></span>';
     }).join('');
     return '<div class="dm-section">' +
       '<div class="dm-section-title">品类选项</div>' +
       '<p class="dm-note">图鉴条目的品类选项（默认：吧唧/纸片/立牌/毛绒/其他），可新增、编辑、删除；删除后该品类下的条目归入「其他」。未填写品类的条目显示为「其他」。</p>' +
-      '<div class="dm-group">' + (rows || '<span class="muted">暂无品类，请新增</span>') +
+      '<div class="dm-group">' +
+        '<div class="dm-chips">' + (chips || '<span class="muted">暂无品类，请新增</span>') + '</div>' +
         '<div class="dm-add-row"><input class="input" id="cat-add" type="text" autocomplete="off" placeholder="新增品类，如：徽章">' +
         '<button type="button" class="btn btn--sm" data-act="add-cat">添加</button></div>' +
       '</div>' +

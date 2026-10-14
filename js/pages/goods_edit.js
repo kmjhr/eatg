@@ -598,20 +598,31 @@
     var ref = UI.sheet({
       title: '添加图片',
       bodyHTML: '<div class="opt-list">' +
-        '<label class="opt-row" data-src="camera">' +
+        '<span class="opt-row opt-row--file" data-src="camera">' +
+          '<button type="button" class="opt-row-btn">拍照</button>' +
           '<input type="file" class="input-cover" accept="image/*" capture="environment" data-src="camera">' +
-          '<span>拍照</span><span class="opt-check">›</span></label>' +
-        '<label class="opt-row" data-src="album">' +
+          '<span class="opt-check">›</span></span>' +
+        '<span class="opt-row opt-row--file" data-src="album">' +
+          '<button type="button" class="opt-row-btn">从相册选择</button>' +
           '<input type="file" class="input-cover" accept="image/*" multiple data-src="album">' +
-          '<span>从相册选择</span><span class="opt-check">›</span></label>' +
+          '<span class="opt-check">›</span></span>' +
         '</div>'
     });
-    // 用户真实触摸 input 触发 change（不依赖 JS click，微信/TWA/WebView 均放行）
+    // 通道1：input 覆盖按钮，真实触摸直接弹选择器（微信/TWA 放行）
+    // 通道2：若覆盖层失效（点击落在按钮上），兜底 JS click（Chrome/Safari 用户手势内放行）
+    // 两路互斥：命中 input 本体时不再手动 click，避免重复弹窗
     ref.body.addEventListener('change', function (e) {
-      var inp = e.target.closest('input[data-src]');
+      var inp = e.target.closest('input[type=file]');
       if (!inp) return;
       ref.close();
       handleFiles(inp.files, inp);
+    });
+    ref.body.addEventListener('click', function (e) {
+      var row = e.target.closest('.opt-row--file');
+      if (!row) return;
+      var inp = row.querySelector('input[type=file]');
+      if (!inp || e.target === inp) return;
+      try { inp.click(); } catch (err) { console.error('[EATG] 文件选择兜底失败', err); }
     });
   }
 

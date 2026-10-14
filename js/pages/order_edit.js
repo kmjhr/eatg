@@ -184,8 +184,8 @@
       }).join('');
     var img = state.orderImage
       ? '<div class="order-img"><img src="' + state.orderImage + '" alt=""><button type="button" class="cell-del" data-act="rm-img" aria-label="移除截图">×</button></div>'
-      : '<label class="order-img-add" style="position:relative">＋<span>订单截图</span>' +
-        '<input type="file" id="o-file" class="input-cover" accept="image/*"></label>';
+      : '<span class="order-img-add" style="position:relative">＋<span>订单截图</span>' +
+        '<input type="file" id="o-file" class="input-cover" accept="image/*"></span>';
     return '<div class="form-section">' +
       '<h2 class="section-title">订单信息</h2>' +
       '<div class="field"><div class="field-head"><label class="field-label" for="o-name">订单名称</label></div>' +
@@ -737,6 +737,11 @@
       if (a === 'goto-goods') { go('#/goods/detail?id=' + act.dataset.gid); return; }
       if (a === 'apply-split') { applySplit(); return; }
       if (a === 'apply-body') { applyBodySplit(); return; }
+      // 订单截图：input 覆盖按钮真实触摸；覆盖失效时点击落在此处 → 兜底 JS click（两路互斥）
+      if (e.target.closest('.order-img-add')) {
+        if (dom.file && e.target !== dom.file) { try { dom.file.click(); } catch (err) { console.error('[EATG] 截图兜底失败', err); } }
+        return;
+      }
       if (a === 'rm-img') { syncInputs(); state.orderImage = null; render(); UI.toast('已移除截图', 'success'); return; }
       if (a === 'add-channel') { onAddChannel(); return; }
       if (a === 'save') { doSave(); return; }

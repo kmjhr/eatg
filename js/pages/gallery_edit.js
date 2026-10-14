@@ -87,8 +87,8 @@
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
           '<div class="ge-img-row">' +
             (it.image ? '<img class="ge-img" src="' + esc(it.image) + '">' : '<div class="ge-img ge-img--ph">无图</div>') +
-            '<label class="btn btn--secondary" id="ge-img-btn" style="position:relative">选择图片' +
-              '<input type="file" id="ge-img-input" class="input-cover" accept="image/*"></label>' +
+            '<span class="btn btn--secondary" id="ge-img-btn" style="position:relative">选择图片' +
+              '<input type="file" id="ge-img-input" class="input-cover" accept="image/*"></span>' +
             (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-clear">清除</button>' : '') +
           '</div></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">关联谷子款（可选）</label></div>' +
@@ -120,7 +120,11 @@
   }
 
   function bind(ctx) {
-    // 图片选择：input 覆盖在按钮上，真实触摸触发（不依赖 JS click，微信/TWA/WebView 均放行）
+    // 图片选择：input 覆盖按钮真实触摸；覆盖失效时点击按钮兜底 JS click（两路互斥）
+    on(dom.imgBtn, 'click', function (e) {
+      if (e.target === dom.imgInput) return;
+      try { dom.imgInput.click(); } catch (err) { console.error('[EATG] 图鉴选图兜底失败', err); }
+    });
     on(dom.imgInput, 'change', function () {
       var f = dom.imgInput.files[0];
       if (!f) return;

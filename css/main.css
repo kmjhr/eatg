@@ -1863,3 +1863,5 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-cat-chip{flex:0 0 auto;padding:4px 12px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:transparent;font-size:12px;color:var(--text,#1a1a1a);white-space:nowrap;cursor:pointer}
 [data-theme="dark"] .gal-cat-chip{border-color:rgba(255,255,255,.22);color:#eee}
 .gal-cat-chip.is-on{background:#f6c64b;border-color:#f6c64b;color:#1a1a1a;font-weight:600}
+/* icon-btn 文字变体（用于按钮内需显示文字的场景，避免字比按钮大） */
+.icon-btn--text{width:auto;height:26px;padding:0 10px;font-size:12px;font-weight:600;border-radius:8px;gap:2px}

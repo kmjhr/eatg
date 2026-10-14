@@ -329,8 +329,8 @@
       return '<article class="sale-item" data-sid="' + s.id + '">' +
         '<div class="sale-head"><span class="num">' + UI.esc(s.sale_date || '—') + '</span><span class="muted">' + UI.esc(s.channel || '—') + '</span>' +
           '<div class="sale-actions">' +
-            '<button type="button" class="icon-btn" data-act="edit-sale" data-sid="' + s.id + '" title="编辑">编辑</button>' +
-            '<button type="button" class="icon-btn icon-btn--danger" data-act="del-sale" data-sid="' + s.id + '" title="删除">删除</button>' +
+            '<button type="button" class="icon-btn icon-btn--text" data-act="edit-sale" data-sid="' + s.id + '" title="编辑">编辑</button>' +
+            '<button type="button" class="icon-btn icon-btn--text icon-btn--danger" data-act="del-sale" data-sid="' + s.id + '" title="删除">删除</button>' +
           '</div>' +
         '</div>' +
         '<div class="sale-row"><span class="muted">卖价</span><span class="num">' + money(num(s.unit_price) * num(s.quantity), s.currency) + '</span></div>' +

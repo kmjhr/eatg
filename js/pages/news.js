@@ -571,7 +571,7 @@
       '<button id="nf-wishlist" type="button" class="icon-btn" title="愿望清单">♡</button>' +
       '<button id="nf-sources" type="button" class="icon-btn" title="监控源">⚙</button>' +
       '<button id="nf-add" type="button" class="icon-btn icon-btn--accent" title="手动添加">＋</button>' +
-      '<button id="nf-multi" type="button" class="icon-btn" title="多选">多选</button>';
+      '<button id="nf-multi" type="button" class="icon-btn icon-btn--text" title="多选">多选</button>';
     var wl = document.getElementById('nf-wishlist');
     var src = document.getElementById('nf-sources');
     var add = document.getElementById('nf-add');

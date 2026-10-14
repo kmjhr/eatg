@@ -707,8 +707,8 @@
   // ---- 截图 ----
 
   function openEditor(src) {
-    if (!src || !EATG.imgEditor) return;
-    EATG.imgEditor.open(src).then(function (newSrc) {
+    if (!src || !U.openImageEditor) return;
+    U.openImageEditor(src).then(function (newSrc) {
       if (state.destroyed || !newSrc || newSrc === src) return;
       state.orderImage = newSrc;
       render();

@@ -92,15 +92,21 @@
     return order.map(function (k) { return map[k]; });
   }
 
-  /** 按状态聚合（剩余件数） */
-  function groupByStatus(model) {
+  /** 按状态聚合：value=成本（含估算，未知计 0），count=剩余件数，含构成明细 */
+  function groupByStatus(model, goodsById) {
     var map = {}, order = [];
     (model.purchases || []).forEach(function (p) {
       var remain = num(p.quantity) - num(p.sold_quantity);
       if (remain <= 0) return;
       var k = p.status || 'unknown';
-      if (!map[k]) { map[k] = { label: A.STATUS_LABELS[k] || k, value: 0, key: k }; order.push(k); }
-      map[k].value += remain;
+      if (!map[k]) { map[k] = { label: A.STATUS_LABELS[k] || k, value: 0, count: 0, unknown: 0, items: [] }; order.push(k); }
+      var g = goodsById && goodsById[p.goods_id];
+      var name = g && g.name ? g.name : ('谷子#' + p.goods_id);
+      var cost = A.purchaseCost(p);
+      map[k].value += cost;
+      map[k].count += remain;
+      if (p.price_status === 'unknown') map[k].unknown += remain;
+      map[k].items.push({ name: name, qty: remain, cost: cost, status: p.price_status });
     });
     return order.map(function (k) { return map[k]; });
   }
@@ -347,7 +353,7 @@
     return '<div class="charts-grid">' +
       chartBlockHTML('chart-ip', 'IP 占比', hint) +
       chartBlockHTML('chart-type', '类型占比', hint) +
-      chartBlockHTML('chart-status', '状态占比', '按剩余件数') +
+      chartBlockHTML('chart-status', '状态占比', '按剩余件数 · 点扇区看成本（含估算，未知计 0）') +
       '<div class="chart-block chart-block--wide">' +
         '<div class="chart-title">月度花费<span class="chart-hint">柱状=成本，折线=邮费占比</span></div>' +
         '<div class="chart-body"><canvas id="chart-month"></canvas></div>' +
@@ -396,13 +402,14 @@
       var g = gName(p.goods_id);
       return '<tr><td>' + p.id + '</td><td>' + p.goods_id + '</td><td>' +
         (p.unit_price == null ? '—' : (p.unit_price / 100).toFixed(2)) + '</td><td>' + num(p.quantity) + '</td><td>' +
-        esc(p.price_status || '—') + '</td><td>' + esc(g ? g.name : '?') + '</td><td>' + esc(g ? g.ip : '?') + '</td></tr>';
+        esc(p.price_status || '—') + '</td><td>' + esc(p.buy_date || '—') + '</td><td>' +
+        esc(A.STATUS_LABELS[p.status] || p.status || '—') + '</td><td>' + esc(g ? g.name : '?') + '</td><td>' + esc(g ? g.ip : '?') + '</td></tr>';
     }).join('');
     var gs = (model.goods || []).map(function (g) {
       return '<tr><td>' + g.id + '</td><td>' + esc(g.name || '') + '</td><td>' + esc(g.ip || '—') + '</td><td>' + esc(g.goods_type || '—') + '</td></tr>';
     }).join('');
     return '<details class="dbg"><summary>数据自检（排查用 · 点开）</summary>' +
-      '<p class="dbg-tip">购入记录：id / goods_id / 单价(元) / 数量 / 价格状态 / 谷子名 / 谷子IP</p>' +
+      '<p class="dbg-tip">购入记录：id / goods_id / 单价(元) / 数量 / 价格状态 / 日期 / 在库状态 / 谷子名 / 谷子IP</p>' +
       '<table class="dbg-tbl"><tbody>' + (ps || '<tr><td>无购入记录</td></tr>') + '</tbody></table>' +
       '<p class="dbg-tip">谷子款：id / 名称 / IP / 类型</p>' +
       '<table class="dbg-tbl"><tbody>' + (gs || '<tr><td>无谷子款</td></tr>') + '</tbody></table>' +
@@ -460,11 +467,11 @@
     chartRefs.push({ canvas: typeCanvas, ref: typeRef, type: 'donut' });
     renderLegend('chart-type-legend', typeSegs);
 
-    // 状态占比
-    var stData = groupByStatus(state.model);
+    // 状态占比（value=成本、count=剩余件数：占比与中心均按剩余件数，点开看成本+明细）
+    var stData = groupByStatus(state.model, goodsById);
     var stSegs = donutSegments(stData);
     var stCanvas = document.getElementById('chart-status');
-    var stRef = drawDonut(stCanvas, stSegs, String(stData.reduce(function (a, d) { return a + d.value; }, 0)), '件');
+    var stRef = drawDonut(stCanvas, stSegs, String(stData.reduce(function (a, d) { return a + d.count; }, 0)), '件');
     chartRefs.push({ canvas: stCanvas, ref: stRef, type: 'donut' });
     renderLegend('chart-status-legend', stSegs);
 
@@ -478,11 +485,11 @@
   function showDetail(detailId, data, kind) {
     var el = document.getElementById(detailId);
     if (!el || !data) { el.innerHTML = ''; return; }
-    // 状态占比：data 只有 {label, value=剩余件数}，无 items —— 显示件数，不是金额
+    // 防御：极端情况下分组无 items（不应发生）——显示件数
     if (data.items == null) {
       el.innerHTML = '<div class="chart-detail-row">' +
         '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
-        '<span class="chart-detail-value">' + num(data.value) + ' 件</span>' +
+        '<span class="chart-detail-value">' + num(data.count != null ? data.count : data.value) + ' 件</span>' +
       '</div>';
       return;
     }

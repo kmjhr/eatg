@@ -1,10 +1,13 @@
 /* ==========================================================================
    一咕（EATG）· RSS 抓取模块（js/rss.js）
    实现：监控源（sources）里类型为 RSS（或填了真实 feed 地址）的源，
-        通过 直连 → 公共 CORS 代理 逐级尝试，解析 RSS 2.0 / Atom，
+        通过 直连 → rss2json → allorigins → codetabs 逐级尝试，
+        解析 RSS 2.0 / Atom（XML 或 rss2json JSON），
+        自动翻译标题/摘要为中文（Google 免费端点，批量一次请求），
+        提取条目图片（thumbnail / enclosure / media: 标签 / description 内 img），
         去重后写入 news 表（source_id 关联监控源），供资讯页展示。
    说明：纯前端无法保证后台定时，自动抓取发生在打开资讯页时（按频率判断）；
-        抓取失败/被 CORS 拦截时给出可读提示。
+        翻译失败/抓取失败时自动回退原文并给出可读提示。
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -15,6 +18,8 @@
   // 单次抓取最多写入条数（避免首次全量写入过多）
   var MAX_PER_FETCH = 50;
   var FETCH_TIMEOUT = 12000; // 单次请求超时 12s
+  var DESC_MAX = 300;        // 摘要最大长度
+  var DESC_TRANSLATE_N = 6;  // 摘要翻译条数（避免请求过大）
 
   function fetchText(url) {
     var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -36,11 +41,15 @@
     });
   }
 
+  function fetchJSON(url) {
+    return fetchText(url).then(function (t) { return JSON.parse(t); });
+  }
+
   /** 直连 → 公共代理逐级尝试，返回 { xml } 或 { json }（rss2json） */
   function getFeed(url) {
     // 1) 直连（RSS 源自身支持 CORS 时最快）
     return fetchText(url).then(function (t) { return { xml: t }; })
-    // 2) rss2json（JSON，CORS 友好，2026-10 实测可用）
+    // 2) rss2json（JSON，CORS 友好，实测可用）
     .catch(function () {
       return fetchJSON('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url)).then(function (j) {
         if (!j || j.status !== 'ok') throw new Error((j && j.message) || 'RSS2JSON 返回异常');
@@ -57,16 +66,39 @@
     });
   }
 
-  function fetchJSON(url) {
-    return fetchText(url).then(function (t) { return JSON.parse(t); });
-  }
-
   function textOf(parent, tag) {
     var el = parent.getElementsByTagName(tag)[0];
     return el ? (el.textContent || '').trim() : '';
   }
 
-  /** 解析 RSS 2.0（<item>）或 Atom（<entry>） */
+  /** 从 XML 条目里提取图片 URL */
+  function xmlItemImage(it) {
+    var enc = it.getElementsByTagName('enclosure')[0];
+    if (enc) {
+      var t = enc.getAttribute('type') || '';
+      var u = enc.getAttribute('url');
+      if (u && t.indexOf('image') === 0) return u;
+    }
+    var mc = it.getElementsByTagName('media:content')[0];
+    if (mc && mc.getAttribute('url')) return mc.getAttribute('url');
+    var mt = it.getElementsByTagName('media:thumbnail')[0];
+    if (mt && mt.getAttribute('url')) return mt.getAttribute('url');
+    var ii = it.getElementsByTagName('itunes:image')[0];
+    if (ii && ii.getAttribute('href')) return ii.getAttribute('href');
+    var links = it.getElementsByTagName('link');
+    for (var i = 0; i < links.length; i++) {
+      var rel = links[i].getAttribute('rel');
+      if (rel === 'enclosure' || rel === 'image') {
+        var h = links[i].getAttribute('href');
+        if (h) return h;
+      }
+    }
+    var desc = textOf(it, 'description') || textOf(it, 'summary') || '';
+    var m = /<img[^>]+src=["']([^"']+)["']/i.exec(desc);
+    return m ? m[1] : '';
+  }
+
+  /** 解析 RSS 2.0（<item>）或 Atom（<entry>）→ 统一条目 */
   function parseXMLItems(xmlText) {
     var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('返回内容不是有效的 RSS/XML');
@@ -91,29 +123,74 @@
         title: title,
         link: link || '',
         date: textOf(it, 'pubDate') || textOf(it, 'published') || textOf(it, 'updated') || '',
-        desc: textOf(it, 'description') || textOf(it, 'summary') || ''
+        desc: textOf(it, 'description') || textOf(it, 'summary') || '',
+        image: xmlItemImage(it)
       });
     }
     if (!out.length) throw new Error('RSS 里没有可用的条目');
     return out;
   }
 
-  /** 解析 rss2json 返回的 JSON（items 数组） */
+  /** 解析 rss2json 返回的 JSON → 统一条目 */
   function parseJSONItems(j) {
     var items = j.items || [];
     return items.map(function (it) {
+      var img = (it.thumbnail || (it.enclosure && it.enclosure.image) || '');
+      if (!img) {
+        var m = /<img[^>]+src=["']([^"']+)["']/i.exec(it.description || '');
+        if (m) img = m[1];
+      }
       return {
         title: (it.title || '').trim(),
         link: it.link || '',
         date: it.pubDate || it.published || it.updated || '',
-        desc: it.description || it.content || ''
+        desc: it.description || it.content || '',
+        image: img
       };
     }).filter(function (it) { return it.title; });
   }
 
-  /** 统一入口：{xml} 或 {json} → 条目数组 */
+  /** 统一入口：{xml} 或 {json} → 统一条目数组 */
   function parseFeed(feed) {
     return feed.json ? parseJSONItems(feed.json) : parseXMLItems(feed.xml);
+  }
+
+  function stripHTML(s) {
+    return String(s || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function isChinese(s) {
+    return /[\u4e00-\u9fff]/.test(s);
+  }
+
+  /** 批量翻译（一次请求，\n 分隔）；非中文才翻译；返回与原数组等长的数组（null = 不翻译/失败） */
+  function translateBatch(texts) {
+    var need = [], idx = [];
+    texts.forEach(function (t, i) {
+      if (t && !isChinese(t)) { need.push(t); idx.push(i); }
+    });
+    var out = texts.map(function () { return null; });
+    if (!need.length) return Promise.resolve(out);
+    var q = need.join('\n');
+    return fetchJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=' + encodeURIComponent(q))
+      .then(function (j) {
+        var arr = j && j[0];
+        if (!arr || !arr.length) return out;
+        need.forEach(function (t, k) {
+          var seg = arr[k];
+          if (seg && seg[0] && seg[0] !== t) out[idx[k]] = seg[0];
+        });
+        return out;
+      })
+      .catch(function () { return out; });
   }
 
   /** 抓取单个监控源 → { ok, added, skipped, error, ms }；成功时写回 last_fetch_at/last_result */
@@ -124,25 +201,42 @@
     return getFeed(src.url).then(function (feed) {
       var items = parseFeed(feed);
       var take = items.slice(0, MAX_PER_FETCH);
+      // 翻译：标题全量（一次请求）+ 摘要前 N 条（一次请求）
+      return translateBatch(take.map(function (it) { return it.title; })).then(function (titleZh) {
+        return translateBatch(take.slice(0, DESC_TRANSLATE_N).map(function (it) { return stripHTML(it.desc).slice(0, DESC_MAX); }))
+          .then(function (descZh) {
+            return { items: take, titleZh: titleZh, descZh: descZh };
+          });
+      });
+    }).then(function (pack) {
+      var items = pack.items;
+      var titleZh = pack.titleZh;
+      var descZh = pack.descZh;
       return S.query('news', 'source_id', sid).then(function (exist) {
         var have = {};
         (exist || []).forEach(function (n) {
           if (n.link) have[n.link] = 1;
+          else if (n.title_raw) have['t:' + n.title_raw] = 1;
           else if (n.title) have['t:' + n.title] = 1;
         });
         var skipped = 0;
         var recs = [];
-        take.forEach(function (it) {
+        items.forEach(function (it, i) {
           var key = it.link ? it.link : ('t:' + it.title);
           if (have[key]) { skipped++; return; }
           have[key] = 1;
+          var zh = titleZh[i];
+          var desc = stripHTML(it.desc).slice(0, DESC_MAX);
+          var descZhText = i < DESC_TRANSLATE_N ? (descZh[i] || '') : '';
           recs.push({
             source_id: sid,
-            title: it.title,
+            title: zh || it.title,
+            title_raw: zh ? it.title : '',
             link: it.link,
             channel: src.name || 'RSS',
+            image: it.image || '',
             pub_date: it.date,
-            note: it.desc ? it.desc.slice(0, 300) : '',
+            note: (descZhText || desc),
             is_read: false,
             status: ''
           });

@@ -89,6 +89,7 @@
     var r = state.record;
     var img = r.image ? '<img class="ne-detail-img" src="' + r.image + '" alt="">' : '<div class="ne-detail-img ne-detail-img--ph">无图</div>';
     var actions = '<div class="ne-detail-actions">' +
+      (r.link ? '<a class="btn btn--secondary" href="' + esc(r.link) + '" target="_blank" rel="noopener noreferrer">打开原文</a>' : '') +
       '<button type="button" class="btn btn--secondary" data-act="wish">想买</button>' +
       '<button type="button" class="btn btn--primary" data-act="order">已订</button>' +
       '<button type="button" class="btn btn--danger" data-act="ignore">忽略</button>' +
@@ -103,6 +104,7 @@
       '<div class="ne-detail">' +
         img +
         '<h2 class="ne-detail-title">' + esc(r.title) + '</h2>' +
+        (r.title_raw ? '<p class="ne-detail-title-raw">原文：' + esc(r.title_raw) + '</p>' : '') +
         '<div class="ne-detail-meta">' +
           (r.ip ? '<span class="tag tag--ip">' + esc(r.ip) + '</span>' : '') +
           (charNames(r.character_ids) ? '<span class="tag">' + esc(charNames(r.character_ids)) + '</span>' : '') +

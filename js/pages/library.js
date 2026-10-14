@@ -205,7 +205,7 @@
     var s = state.model.summary;
     var cells = [
       { label: '总件数', value: String(s.net_qty) },
-      { label: '总投入', value: money(s.filled_cost) },
+      { label: '总投入', value: money(num(s.filled_cost) + num(s.estimated_cost)) },
       { label: '总盈利', value: money(s.total_profit), cls: s.total_profit > 0 ? 'up' : (s.total_profit < 0 ? 'down' : '') },
       { label: '在手', value: String(s.on_hand) },
       { label: '在途', value: String(s.in_transit) },
@@ -322,7 +322,7 @@
           '<div class="chip-row">' + chips + '</div>' +
           '<div class="metric-row">' +
             '<span class="metric qty num">' + qty + '</span>' +
-            '<span class="metric money">' + money(agg.filled_only_cost) + '</span>' +
+            '<span class="metric money" title="' + (num(agg.estimated_cost) ? ('含估算 ' + money(agg.estimated_cost)) : '总投入（已填写）') + '">' + money(num(agg.filled_only_cost) + num(agg.estimated_cost)) + '</span>' +
             profitCellHTML(agg) +
           '</div>' +
         '</div>' +

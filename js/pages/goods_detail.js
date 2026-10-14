@@ -234,8 +234,8 @@
     return '<section class="block agg-block">' +
       '<div class="agg-grid">' +
         '<div class="agg-cell"><div class="agg-num num">' + num(agg.total_qty) + '</div><div class="agg-label">总数量</div></div>' +
-        '<div class="agg-cell"><div class="agg-num num">' + money(agg.filled_only_cost) + '</div><div class="agg-label">总投入（含邮费）</div>' +
-          (agg.estimated_cost ? '<div class="est-tag">另估算 ' + money(agg.estimated_cost) + '</div>' : '') + '</div>' +
+        '<div class="agg-cell"><div class="agg-num num">' + money(agg.total_cost) + '</div><div class="agg-label">总投入（含邮费）</div>' +
+          (agg.estimated_cost ? '<div class="est-tag">其中估算 ' + money(agg.estimated_cost) + ' · ' + num(agg.estimated_qty) + ' 件</div>' : '') + '</div>' +
         '<div class="agg-cell"><div class="agg-num num">' + (avg == null ? '--' : money(avg)) + '</div><div class="agg-label">均价（已填写）</div></div>' +
         '<div class="agg-cell"><div class="agg-label">累计盈利</div>' + profitCell() + '</div>' +
       '</div>' +

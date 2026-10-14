@@ -247,7 +247,9 @@
 
   function donutSegments(list) {
     return list.map(function (it, i) {
-      return { label: it.label, value: it.value, color: PALETTE[i % PALETTE.length], data: it };
+      // 占比按件数（与环图中心"件"口径一致）；成本保留在 data 供点击详情展示。
+      // IP/类型分组有 count；状态分组只有 value（本身就是剩余件数）。
+      return { label: it.label, value: (it.count != null ? it.count : it.value), color: PALETTE[i % PALETTE.length], data: it };
     });
   }
 
@@ -324,8 +326,8 @@
 
   function chartsHTML() {
     return '<div class="charts-grid">' +
-      chartBlockHTML('chart-ip', 'IP 占比', '按购入成本') +
-      chartBlockHTML('chart-type', '类型占比', '按购入成本') +
+      chartBlockHTML('chart-ip', 'IP 占比', '按件数 · 点扇区看成本') +
+      chartBlockHTML('chart-type', '类型占比', '按件数 · 点扇区看成本') +
       chartBlockHTML('chart-status', '状态占比', '按剩余件数') +
       '<div class="chart-block chart-block--wide">' +
         '<div class="chart-title">月度花费<span class="chart-hint">柱状=成本，折线=邮费占比</span></div>' +

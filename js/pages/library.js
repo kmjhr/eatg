@@ -45,7 +45,7 @@
       view: 'goods',                 // 'goods' | 'order'
       keyword: '',
       sort: 'purchase_time',
-      filters: { ip: [], char: [], type: [], status: [], channel: [], price: [] },
+      filters: { ip: [], char: [], type: [], status: [], channel: [], price: [], bag: [], loc: [] },
       enums: {},
       batchMode: false,
       selected: [],
@@ -85,16 +85,18 @@
 
   function facetsOf(g) {
     var items = state.model.byGoods[g.id] || [];
-    var statuses = [], channels = [], prices = [];
+    var statuses = [], channels = [], prices = [], bags = [], locs = [];
     var statusesRemaining = false;
     items.forEach(function (p) {
       statuses.push(p.status);
       if (p.channel) channels.push(p.channel);
       prices.push(p.price_status);
+      if (p.has_bag != null) bags.push(p.has_bag ? '1' : '0');
+      if (p.location) locs.push(p.location);
       if (num(p.quantity) - num(p.sold_quantity) > 0) statusesRemaining = true;
     });
     if (!statusesRemaining && items.length) statuses = ['sold_out'];
-    return { status: statuses, channel: channels, price: prices };
+    return { status: statuses, channel: channels, price: prices, bag: bags, loc: locs };
   }
 
   // ---- 过滤 / 搜索 / 排序 ----
@@ -107,10 +109,12 @@
       var ids = g.character_ids || [];
       if (!ids.some(function (id) { return f.char.indexOf(id) !== -1; })) return false;
     }
-    var fac = state.index.facets[g.id] || { status: [], channel: [], price: [] };
+    var fac = state.index.facets[g.id] || { status: [], channel: [], price: [], bag: [], loc: [] };
     if (f.status.length && !f.status.some(function (s) { return fac.status.indexOf(s) !== -1; })) return false;
     if (f.channel.length && !f.channel.some(function (c) { return fac.channel.indexOf(c) !== -1; })) return false;
     if (f.price.length && !f.price.some(function (p) { return fac.price.indexOf(p) !== -1; })) return false;
+    if (f.bag.length && !f.bag.some(function (b) { return fac.bag.indexOf(b) !== -1; })) return false;
+    if (f.loc.length && !f.loc.some(function (l) { return fac.loc.indexOf(l) !== -1; })) return false;
     return true;
   }
 
@@ -159,7 +163,7 @@
 
   function hasActiveFilters() {
     var f = state.filters;
-    return f.ip.length + f.char.length + f.type.length + f.status.length + f.channel.length + f.price.length > 0;
+    return f.ip.length + f.char.length + f.type.length + f.status.length + f.channel.length + f.price.length + f.bag.length + f.loc.length > 0;
   }
 
   // ---- 视图：骨架 / 摘要条 / 工具栏 ----
@@ -740,13 +744,17 @@
       type: { title: '类型', type: 'value', opts: typeOpts },
       status: { title: '状态', type: 'status', opts: A.STATUS_ORDER },
       channel: { title: '渠道', type: 'value', opts: channelOpts },
-      price: { title: '价格状态', type: 'price', opts: A.PRICE_ORDER }
+      price: { title: '价格状态', type: 'price', opts: A.PRICE_ORDER },
+      bag: { title: '原袋', type: 'value', opts: ['1', '0'] },
+      loc: { title: '位置', type: 'value', opts: ['home', 'school', 'other'] }
     };
   }
 
   function labelOf(cat, v) {
     if (cat === 'status') return A.STATUS_LABELS[v];
     if (cat === 'price') return A.PRICE_LABELS[v];
+    if (cat === 'bag') return v === '1' ? '有原袋' : '无原袋';
+    if (cat === 'loc') return { home: '在家', school: '在校', other: '其他' }[v] || v;
     return v;
   }
 
@@ -754,7 +762,8 @@
     var sets = optionSets();
     var draft = {
       ip: state.filters.ip.slice(), char: state.filters.char.slice(), type: state.filters.type.slice(),
-      status: state.filters.status.slice(), channel: state.filters.channel.slice(), price: state.filters.price.slice()
+      status: state.filters.status.slice(), channel: state.filters.channel.slice(), price: state.filters.price.slice(),
+      bag: state.filters.bag.slice(), loc: state.filters.loc.slice()
     };
     var html = Object.keys(sets).map(function (cat) {
       var cfg = sets[cat];
@@ -803,7 +812,7 @@
         var b = e.target.closest('[data-act]');
         if (!b) return;
         if (b.dataset.act === 'reset') {
-          draft = { ip: [], char: [], type: [], status: [], channel: [], price: [] };
+          draft = { ip: [], char: [], type: [], status: [], channel: [], price: [], bag: [], loc: [] };
           syncChips();
         } else if (b.dataset.act === 'apply') {
           state.filters = draft;
@@ -817,7 +826,7 @@
   }
 
   function clearFilters() {
-    state.filters = { ip: [], char: [], type: [], status: [], channel: [], price: [] };
+    state.filters = { ip: [], char: [], type: [], status: [], channel: [], price: [], bag: [], loc: [] };
   }
 
   function setView(view) {
@@ -869,7 +878,7 @@
   function updateFilterIndicator() {
     if (!dom.filterEl) return;
     var n = state.filters.ip.length + state.filters.char.length + state.filters.type.length +
-      state.filters.status.length + state.filters.channel.length + state.filters.price.length;
+      state.filters.status.length + state.filters.channel.length + state.filters.price.length + state.filters.bag.length + state.filters.loc.length;
     var badge = dom.filterEl.querySelector('.icon-badge');
     dom.filterEl.classList.toggle('is-active', n > 0);
     if (badge) { badge.hidden = n === 0; badge.textContent = String(n); }

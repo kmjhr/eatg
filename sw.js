@@ -6,7 +6,7 @@
    ========================================================================== */
 'use strict';
 
-var CACHE = 'eatg-shell-v2';
+var CACHE = 'eatg-shell-v3';
 var PRECACHE = [
   './',
   './index.html',
@@ -19,10 +19,12 @@ var PRECACHE = [
   './js/app.js',
   './js/reminder.js',
   './js/gallery_import.js',
+  './js/batch_scan.js',
   './js/dev_seed.js',
   './js/pages/library.js',
   './js/pages/goods_edit.js',
   './js/pages/goods_detail.js',
+  './js/pages/goods_batch.js',
   './js/pages/orders.js',
   './js/pages/order_edit.js',
   './js/pages/sales.js',

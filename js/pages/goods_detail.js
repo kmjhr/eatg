@@ -244,6 +244,14 @@
       '</section>';
   }
 
+  /** 原袋按钮：未标（null）→ 有（true）→ 无（false）→ 未标 */
+  function bagBtnHTML(p) {
+    var v = p.has_bag;
+    var cls = v === true ? 'is-yes' : (v === false ? 'is-no' : 'is-off');
+    var label = v === true ? '原袋·有' : (v === false ? '原袋·无' : '原袋·未标');
+    return '<button type="button" class="tl-bag ' + cls + '" data-act="toggle-bag" data-pid="' + p.id + '" title="点击切换：未标 → 有 → 无">' + label + '</button>';
+  }
+
   function timelineHTML() {
     var list = sortedPurchases();
     var head = '<div class="block-head"><h3 class="block-title">购入记录（' + list.length + '）</h3>' +
@@ -266,7 +274,7 @@
         '<div class="tl-body">' +
           '<div class="tl-head">' +
             '<span class="tl-date num">' + UI.esc(p.buy_date || '—') + '</span>' +
-            badgeHTML(p.status) + priceTag +
+            badgeHTML(p.status) + priceTag + bagBtnHTML(p) +
           '</div>' +
           '<div class="tl-row"><span class="tl-qty num">' + qty + '</span>' + unit + ship + '</div>' +
           '<div class="tl-row muted"><span>渠道：' + UI.esc(p.channel || '—') + '</span>' +
@@ -454,6 +462,7 @@
       if (a === 'add-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&newp=1'); return; }
       if (a === 'edit-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&pid=' + act.dataset.pid); return; }
       if (a === 'goto-order') { go('#/order/edit?id=' + act.dataset.oid); return; }
+      if (a === 'toggle-bag') { toggleBag(act.dataset.pid); return; }
       if (a === 'join-order') { openJoinOrderSheet(); return; }
       if (a === 'add-sale') { openSaleSheet(); return; }
       if (a === 'edit-sale') { go('#/sale/edit?sid=' + act.dataset.sid); return; }
@@ -517,6 +526,30 @@
     });
     ref.foot.addEventListener('click', function (e) {
       if (e.target.closest('[data-act="close"]')) ref.close();
+    });
+  }
+
+  // ---- 原袋标记：点击循环 未标 → 有 → 无 → 未标，即时保存 ----
+
+  function toggleBag(pid) {
+    var p = null;
+    state.purchases.forEach(function (it) { if (Number(it.id) === Number(pid)) p = it; });
+    if (!p) { UI.toast('购入记录不存在', 'error'); return; }
+    var rec = clone(p);
+    if (rec.has_bag == null) rec.has_bag = true;
+    else if (rec.has_bag === true) rec.has_bag = false;
+    else if (rec.has_bag === false) delete rec.has_bag;
+    S.put('purchase_items', rec).then(function () {
+      p.has_bag = rec.has_bag;
+      var btn = dom.container.querySelector('.tl-bag[data-pid="' + pid + '"]');
+      if (btn) {
+        btn.className = 'tl-bag ' + (p.has_bag === true ? 'is-yes' : (p.has_bag === false ? 'is-no' : 'is-off'));
+        btn.textContent = p.has_bag === true ? '原袋·有' : (p.has_bag === false ? '原袋·无' : '原袋·未标');
+      }
+      UI.toast(p.has_bag === true ? '已标记：有原袋' : (p.has_bag === false ? '已标记：无原袋' : '已取消标记'), 'success');
+    }).catch(function (err) {
+      if (!(err && err.expected)) console.error('[EATG] 原袋标记失败', err);
+      UI.toast('保存失败：' + (err && err.message || err), 'error');
     });
   }
 

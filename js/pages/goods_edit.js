@@ -70,6 +70,7 @@
       orderId: null,
       continuous: false,
       priceManual: false,
+      bag: null,
       currency: 'CNY',
       status: 'on_hand',
       enums: { ip: [], goods_type: [], channel: [] },
@@ -226,9 +227,14 @@
     var prefillNote = state.from
       ? '<p class="prefill-note">已按' + UI.esc(state.from === 'order' ? '订单' : '资讯') + '预填，可修改后保存。</p>'
       : '';
+    var batchEntry = state.mode === 'edit'
+      ? ''
+      : '<div class="batch-entry"><button type="button" class="btn btn--secondary" data-act="batch-scan">拍照批量录入</button>' +
+        '<p class="hint">拍一张照片，框选多个谷子 → 自动识别数量与文字 → 一键录入多条。</p></div>';
 
     return '<section class="page page--edit">' +
       prefillNote +
+      batchEntry +
 
       '<div class="form-section">' +
         '<h2 class="section-title">谷子款</h2>' +
@@ -312,6 +318,16 @@
         fieldHTML({ id: 'p-note', label: '购入备注', qw: 'pnote',
           control: '<textarea id="p-note" class="textarea" placeholder="如：合单分摊、补款说明"></textarea>' }) +
 
+        '<div class="field">' +
+          '<div class="field-head"><span class="field-label">原袋</span></div>' +
+          '<div class="chip-select" id="p-bag">' +
+            '<button type="button" class="opt-chip" data-bag="">未标记</button>' +
+            '<button type="button" class="opt-chip" data-bag="1">有原袋</button>' +
+            '<button type="button" class="opt-chip" data-bag="0">无原袋</button>' +
+          '</div>' +
+          '<p class="hint">该件购入是否带原包装袋。</p>' +
+        '</div>' +
+
         '<div class="ext-area" id="p-ext" hidden>' +
           '<p class="section-sub">定尾预售</p>' +
           fieldHTML({ id: 'p-deposit', label: '定金',
@@ -373,6 +389,7 @@
     dom.psManual = c.querySelector('#p-ps-manual');
     dom.psHint = c.querySelector('#p-ps-hint');
     dom.pnote = c.querySelector('#p-note');
+    dom.bag = c.querySelector('#p-bag');
     dom.ext = c.querySelector('#p-ext');
     dom.deposit = c.querySelector('#p-deposit');
     dom.balance = c.querySelector('#p-balance');
@@ -438,6 +455,14 @@
     return 'filled';
   }
 
+  function renderBag() {
+    if (!dom.bag) return;
+    Array.prototype.forEach.call(dom.bag.querySelectorAll('[data-bag]'), function (b) {
+      var on = String(state.bag == null ? '' : (state.bag ? '1' : '0')) === b.dataset.bag;
+      b.classList.toggle('is-on', on);
+    });
+  }
+
   function updatePriceStatusUI() {
     var ps = currentPriceStatus();
     dom.psNow.textContent = A.PRICE_LABELS[ps] || ps;
@@ -481,6 +506,8 @@
     if (dom.status) dom.status.value = state.status;
     state.priceManual = (p.price_status === 'estimated');
     dom.psManual.checked = state.priceManual;
+    state.bag = (p.has_bag == null) ? null : !!p.has_bag;
+    renderBag();
     dom.pnote.value = p.note || '';
 
     dom.deposit.value = centsToYuan(p.deposit);
@@ -534,6 +561,7 @@
 
       var act = e.target.closest('[data-act]');
       if (!act) return;
+      if (act.dataset.act === 'batch-scan') { if (EATG.batchScan && EATG.batchScan.open) EATG.batchScan.open(); return; }
       if (act.dataset.act === 'convert') convertToFullPre();
       else if (act.dataset.act === 'save') doSave();
       else if (act.dataset.act === 'cancel') leave();
@@ -551,6 +579,16 @@
 
     // 状态 → 定尾扩展区
     on(dom.status, 'change', function () { state.status = dom.status.value; toggleExt(); });
+
+    // 原袋三态
+    on(dom.bag, 'click', function (e) {
+      var b = e.target.closest('[data-bag]');
+      if (!b) return;
+      if (b.dataset.bag === '1') state.bag = true;
+      else if (b.dataset.bag === '0') state.bag = false;
+      else state.bag = null;
+      renderBag();
+    });
 
     // 连续录入
     on(dom.continuous, 'change', function () { state.continuous = dom.continuous.checked; });
@@ -854,6 +892,7 @@
         channel: dom.channel ? dom.channel.value : '',
         status: state.status,
         price_status: currentPriceStatus(),
+        has_bag: state.bag,
         deposit: depositCents,
         balance: balanceCents,
         payment_deadline: dom.deadline.value || '',
@@ -893,6 +932,7 @@
 
     if (v.purchase.deposit == null) delete rec.deposit; else rec.deposit = v.purchase.deposit;
     if (v.purchase.balance == null) delete rec.balance; else rec.balance = v.purchase.balance;
+    if (v.purchase.has_bag == null) delete rec.has_bag; else rec.has_bag = v.purchase.has_bag;
     if (!v.purchase.payment_deadline) delete rec.payment_deadline; else rec.payment_deadline = v.purchase.payment_deadline;
     if (v.purchase.remind_enabled == null) delete rec.remind_enabled; else rec.remind_enabled = v.purchase.remind_enabled;
 
@@ -973,6 +1013,7 @@
     state.purchaseId = null;
     state.orderId = null;
     state.priceManual = false;
+    state.bag = null;
     state.characterIds = [];
     state.images = [];
     state.tags = [];

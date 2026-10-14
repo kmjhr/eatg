@@ -48,12 +48,35 @@
     sale_orders: ['total_amount', 'postage']
   };
 
+  // 字段选项管理（enums 中允许用户维护的键；系统枚举不展示）
+  var MANAGE_ENUMS = [
+    { key: 'ip', label: 'IP' },
+    { key: 'goods_type', label: '类型' },
+    { key: 'channel', label: '渠道' },
+    { key: 'sale_channel', label: '卖出渠道' },
+    { key: 'condition', label: '品相' }
+  ];
+
+  // 快捷词（与谷子编辑页共用 localStorage: eatg_quick_words）
+  var QUICK_KEY = 'eatg_quick_words';
+  var QW_FIELDS = [
+    ['name', '名称'], ['channel', '渠道'], ['ip', 'IP'], ['goods_type', '类型'],
+    ['tags', '标签'], ['note', '备注'], ['pnote', '购入备注'], ['unit_price', '本体单价'], ['shipping_share', '邮费分摊']
+  ];
+  var DEFAULT_QUICK_WORDS = {
+    name: ['长崎素世', '吧唧'],
+    channel: ['淘宝', '闲鱼', '日拍', '煤炉'],
+    ip: [], goods_type: [], tags: [], note: [], pnote: [], unit_price: [], shipping_share: []
+  };
+
   function resetState() {
     state = {
       destroyed: false,
       dims: {},
       last_backup_at: null,
-      auto_backup_remind: S.SETTINGS_DEFAULTS.auto_backup_remind
+      auto_backup_remind: S.SETTINGS_DEFAULTS.auto_backup_remind,
+      enums: {},
+      quickWords: {}
     };
     EXPORT_DIMS.forEach(function (d) { state.dims[d.key] = true; });
   }
@@ -61,10 +84,15 @@
   function load() {
     return Promise.all([
       S.getSetting('last_backup_at'),
-      S.getSetting('auto_backup_remind')
+      S.getSetting('auto_backup_remind'),
+      S.getAll('enums')
     ]).then(function (r) {
       state.last_backup_at = r[0] || null;
       state.auto_backup_remind = r[1] || S.SETTINGS_DEFAULTS.auto_backup_remind;
+      var enumsMap = {};
+      (r[2] || []).forEach(function (row) { enumsMap[row.key] = row.values || []; });
+      state.enums = enumsMap;
+      state.quickWords = loadQuickWordsMerged();
     });
   }
 
@@ -278,6 +306,193 @@
   }
 
   // ---- HTML ----
+  // ---- 字段选项 / 快捷词 管理 ----
+
+  function normQW(raw) {
+    var map = {};
+    function push(field, words) {
+      if (!field || !Array.isArray(words)) return;
+      var list = words.map(function (w) { return w == null ? '' : String(w).trim(); }).filter(function (w) { return w; });
+      if (list.length) map[field] = (map[field] || []).concat(list);
+    }
+    if (Array.isArray(raw)) raw.forEach(function (it) { if (it) push(it.field, it.words); });
+    else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function (k) { push(k, raw[k]); });
+    return map;
+  }
+  function loadQuickWordsMerged() {
+    var merged = normQW(DEFAULT_QUICK_WORDS);
+    var stored = null;
+    try { var s = localStorage.getItem(QUICK_KEY); if (s) stored = JSON.parse(s); } catch (e) { stored = null; }
+    var custom = normQW(stored);
+    Object.keys(custom).forEach(function (k) {
+      var base = merged[k] || [];
+      custom[k].forEach(function (w) { if (base.indexOf(w) === -1) base.push(w); });
+      merged[k] = base;
+    });
+    return merged;
+  }
+  function saveQuickWordsFull() {
+    try { localStorage.setItem(QUICK_KEY, JSON.stringify(state.quickWords)); } catch (e) {}
+  }
+
+  function enumsHTML() {
+    return '<div class="dm-section">' +
+      '<div class="dm-section-title">字段选项</div>' +
+      '<p class="dm-note">管理下拉选项（IP / 类型 / 渠道 / 卖出渠道 / 品相）。改动只影响之后的录入，已保存的记录不受影响。</p>' +
+      MANAGE_ENUMS.map(function (cfg) {
+        var vals = state.enums[cfg.key] || [];
+        var chips = vals.map(function (v, i) {
+          return '<span class="dm-chip">' +
+            '<button type="button" class="dm-chip-word" data-act="edit-enum" data-key="' + cfg.key + '" data-i="' + i + '">' + esc(v) + '</button>' +
+            '<button type="button" class="dm-chip-x" data-act="del-enum" data-key="' + cfg.key + '" data-i="' + i + '">×</button></span>';
+        }).join('');
+        return '<div class="dm-group">' +
+          '<div class="dm-group-title">' + esc(cfg.label) + '</div>' +
+          '<div class="dm-chips">' + (chips || '<span class="muted">暂无选项</span>') + '</div>' +
+          '<div class="dm-add-row"><input class="input" id="enum-add-' + cfg.key + '" type="text" autocomplete="off" placeholder="新增' + esc(cfg.label) + '选项">' +
+          '<button type="button" class="btn btn--sm" data-act="add-enum" data-key="' + cfg.key + '">添加</button></div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function quickHTML() {
+    return '<div class="dm-section">' +
+      '<div class="dm-section-title">快捷词</div>' +
+      '<p class="dm-note">谷子录入时「快捷词」面板用到的词，按字段管理，改动即时生效。</p>' +
+      QW_FIELDS.map(function (pair) {
+        var field = pair[0], label = pair[1];
+        var vals = state.quickWords[field] || [];
+        var chips = vals.map(function (v, i) {
+          return '<span class="dm-chip">' +
+            '<button type="button" class="dm-chip-word" data-act="edit-qw" data-field="' + field + '" data-i="' + i + '">' + esc(v) + '</button>' +
+            '<button type="button" class="dm-chip-x" data-act="del-qw" data-field="' + field + '" data-i="' + i + '">×</button></span>';
+        }).join('');
+        return '<div class="dm-group">' +
+          '<div class="dm-group-title">' + esc(label) + '</div>' +
+          '<div class="dm-chips">' + (chips || '<span class="muted">暂无快捷词</span>') + '</div>' +
+          '<div class="dm-add-row"><input class="input" id="qw-add-' + field + '" type="text" autocomplete="off" placeholder="新增快捷词">' +
+          '<button type="button" class="btn btn--sm" data-act="add-qw" data-field="' + field + '">添加</button></div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function rerender() {
+    if (!dom.container || state.destroyed) return;
+    dom.container.innerHTML = pageHTML();
+    bind();
+  }
+
+  function addEnum(key) {
+    var input = document.getElementById('enum-add-' + key);
+    var v = input ? input.value.trim() : '';
+    if (!v) { UI.toast('请输入选项内容', 'error'); return; }
+    var arr = state.enums[key] || (state.enums[key] = []);
+    if (arr.indexOf(v) !== -1) { UI.toast('该选项已存在', 'error'); return; }
+    arr.push(v);
+    S.put('enums', { key: key, values: arr }).then(function () { UI.toast('已添加', 'success'); rerender(); })
+      .catch(function () { UI.toast('保存失败', 'error'); });
+  }
+  function delEnum(key, i) {
+    var arr = state.enums[key] || [];
+    if (i < 0 || i >= arr.length) return;
+    var v = arr[i];
+    UI.confirmDialog({
+      title: '删除选项',
+      message: '删除选项「' + v + '」？只影响之后的下拉列表，已保存的记录保留原值。',
+      confirmText: '删除',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      arr.splice(i, 1);
+      S.put('enums', { key: key, values: arr }).then(function () { UI.toast('已删除', 'success'); rerender(); })
+        .catch(function () { UI.toast('保存失败', 'error'); });
+    });
+  }
+  function editEnum(key, i) {
+    var arr = state.enums[key] || [];
+    if (i < 0 || i >= arr.length) return;
+    var old = arr[i];
+    var ref = UI.sheet({
+      title: '编辑选项',
+      bodyHTML: '<input class="input" id="enum-edit-input" autocomplete="off" value="' + esc(old) + '">',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+        '<button type="button" class="btn btn--primary" data-act="ok">保存</button>'
+    });
+    var input = ref.body.querySelector('#enum-edit-input');
+    if (input) setTimeout(function () { input.focus(); }, 0);
+    if (ref.foot) ref.foot.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act !== 'ok') { ref.close(); return; }
+      var v = input ? input.value.trim() : '';
+      if (!v) { UI.toast('内容不能为空', 'error'); return; }
+      if (arr.indexOf(v) !== -1 && v !== old) { UI.toast('该选项已存在', 'error'); return; }
+      arr[i] = v;
+      S.put('enums', { key: key, values: arr }).then(function () { UI.toast('已保存', 'success'); ref.close(); rerender(); })
+        .catch(function () { UI.toast('保存失败', 'error'); });
+    });
+  }
+
+  function addQW(field) {
+    var input = document.getElementById('qw-add-' + field);
+    var v = input ? input.value.trim() : '';
+    if (!v) { UI.toast('请输入快捷词', 'error'); return; }
+    var arr = state.quickWords[field] || (state.quickWords[field] = []);
+    if (arr.indexOf(v) !== -1) { UI.toast('该快捷词已存在', 'error'); return; }
+    arr.push(v);
+    saveQuickWordsFull();
+    UI.toast('已添加', 'success');
+    rerender();
+  }
+  function delQW(field, i) {
+    var arr = state.quickWords[field] || [];
+    if (i < 0 || i >= arr.length) return;
+    arr.splice(i, 1);
+    saveQuickWordsFull();
+    UI.toast('已删除', 'success');
+    rerender();
+  }
+  function editQW(field, i) {
+    var arr = state.quickWords[field] || [];
+    if (i < 0 || i >= arr.length) return;
+    var old = arr[i];
+    var ref = UI.sheet({
+      title: '编辑快捷词',
+      bodyHTML: '<input class="input" id="qw-edit-input" autocomplete="off" value="' + esc(old) + '">',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+        '<button type="button" class="btn btn--primary" data-act="ok">保存</button>'
+    });
+    var input = ref.body.querySelector('#qw-edit-input');
+    if (input) setTimeout(function () { input.focus(); }, 0);
+    if (ref.foot) ref.foot.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act !== 'ok') { ref.close(); return; }
+      var v = input ? input.value.trim() : '';
+      if (!v) { UI.toast('内容不能为空', 'error'); return; }
+      if (arr.indexOf(v) !== -1 && v !== old) { UI.toast('该快捷词已存在', 'error'); return; }
+      arr[i] = v;
+      saveQuickWordsFull();
+      UI.toast('已保存', 'success');
+      ref.close();
+      rerender();
+    });
+  }
+
+  function manageClick(e) {
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var a = b.dataset.act;
+    if (a === 'add-enum') { addEnum(b.dataset.key); return; }
+    if (a === 'del-enum') { delEnum(b.dataset.key, Number(b.dataset.i)); return; }
+    if (a === 'edit-enum') { editEnum(b.dataset.key, Number(b.dataset.i)); return; }
+    if (a === 'add-qw') { addQW(b.dataset.field); return; }
+    if (a === 'del-qw') { delQW(b.dataset.field, Number(b.dataset.i)); return; }
+    if (a === 'edit-qw') { editQW(b.dataset.field, Number(b.dataset.i)); return; }
+  }
+
   function dimCheckboxes() {
     return EXPORT_DIMS.map(function (d) {
       return '<label class="dm-dim"><input type="checkbox" class="dm-dim-cb" data-key="' + esc(d.key) + '" ' +
@@ -317,6 +532,9 @@
         '<div class="dm-note">恢复前会自动备份当前数据（.pre-restore-时间戳）。仅支持 app=eatg、version≤1 的备份文件。</div>' +
       '</div>' +
 
+      enumsHTML() +
+      quickHTML() +
+
       '<div class="dm-footer">所有数据仅存于本机浏览器，不上传服务器。</div>' +
     '</div>';
   }
@@ -336,6 +554,10 @@
     on(document.getElementById('dm-backup'), 'click', doBackup);
     on(document.getElementById('dm-auto-backup'), 'change', toggleAutoBackup);
     on(document.getElementById('dm-restore'), 'click', triggerRestoreFile);
+    if (!dom.manageBound) {
+      dom.manageBound = true;
+      on(dom.container, 'click', manageClick);
+    }
   }
 
   function mount(container, ctx) {

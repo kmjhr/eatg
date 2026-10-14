@@ -46,7 +46,8 @@
       currentCharId: null,
       search: '',
       groupBySeries: false, // 默认不分组（平铺全部条目），可点「按系列分组」切换
-      swipeMode: false
+      swipeMode: false,
+      autoOwn: false // 刷卡「右滑点亮」开关：默认关闭防误触
     };
     resetDeck();
   }
@@ -186,6 +187,16 @@
   }
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /** 洗牌（Fisher-Yates）——刷卡每次进入/重开都随机打乱顺序 */
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
 
   function deckCardHTML(it, layer) {
     var st = computeItemState(it);
@@ -394,7 +405,7 @@
     var changed = false, prevOwned = false;
     if (item) {
       prevOwned = !!item.owned;
-      if (dir > 0) {
+      if (dir > 0 && state.autoOwn) {   // 右滑点亮仅在开关打开时生效（默认关闭防误触）
         var st = computeItemState(item);
         if (st.state === 'none') {          // 右滑 = 标记拥有（仅未拥有时）
           item.owned = true;
@@ -539,8 +550,13 @@
           '<button type="button" class="btn btn--secondary btn--sm" id="gal-swipe-exit">‹ 网格</button>' +
           '<div class="gal-swipe-count" id="gal-swipe-count"></div>' +
         '</div>' +
+        '<div class="gal-swipe-opt">' +
+          '<label class="switch"><input type="checkbox" id="gal-auto-own"' + (state.autoOwn ? ' checked' : '') + '><span class="switch-track"></span>' +
+            '<span class="switch-label">右滑点亮（标记拥有）</span></label>' +
+          '<span class="gal-swipe-opt-tip">默认关闭防误触</span>' +
+        '</div>' +
         '<div class="gal-deck" id="gal-deck"></div>' +
-        '<div class="gal-swipe-tip">左滑跳过 · 右滑标记拥有 · 点击卡片看详情</div>' +
+        '<div class="gal-swipe-tip">左右滑动翻卡 · 点卡片看详情 · 开关打开时右滑 = 点亮已拥有</div>' +
         '<div class="gal-swipe-actions">' +
           '<button type="button" class="btn btn--secondary" id="gal-swipe-skip">‹ 跳过</button>' +
           '<button type="button" class="btn btn--secondary" id="gal-swipe-undo">上一步</button>' +
@@ -645,7 +661,7 @@
     if (!page) return;
     if (state.swipeMode) {
       page.innerHTML = swipePageHTML();
-      deck.items = currentItems();
+      deck.items = shuffle(currentItems()); // 每次进入刷卡随机打乱
       deck.pos = 0;
       deck.history = [];
       rebuildDeck();
@@ -692,6 +708,8 @@
 
   // ---- 刷卡模式：顶部控制条 + 底部按钮 + 点击详情 ----
   function bindSwipeControls(page) {
+    var ao = document.getElementById('gal-auto-own');
+    if (ao) on(ao, 'change', function () { state.autoOwn = ao.checked; });
     on(page, 'click', function (e) {
       if (e.target.closest('.gal-deck-stamp')) return;
       var btn = e.target.closest('button[id]');
@@ -701,7 +719,7 @@
         else if (id === 'gal-swipe-skip') actionSwipe(-1);
         else if (id === 'gal-swipe-own') actionSwipe(1);
         else if (id === 'gal-swipe-undo') undoSwipe();
-        else if (id === 'gal-deck-restart') { deck.pos = 0; deck.history = []; rebuildDeck(); }
+        else if (id === 'gal-deck-restart') { deck.items = shuffle(deck.items); deck.pos = 0; deck.history = []; rebuildDeck(); }
         return;
       }
       if (deck.suppressTap || deck.locked) return;

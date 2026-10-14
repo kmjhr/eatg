@@ -1638,6 +1638,9 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-toolbar .btn{flex:0 0 auto;padding:0 12px;height:34px;white-space:nowrap}
 .gal-swipe{display:flex;flex-direction:column;align-items:center;padding:0 12px 24px}
 .gal-swipe-head{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:360px;margin:2px auto 10px}
+.gal-swipe-opt{display:flex;align-items:center;gap:8px;width:100%;max-width:360px;margin:0 auto 8px;padding:0 2px}
+.gal-swipe-opt .switch-label{font-size:12px}
+.gal-swipe-opt-tip{font-size:10px;color:var(--muted,#888)}
 .gal-swipe-count{font-size:13px;color:var(--muted,#888)}
 .gal-swipe-count .num{font-weight:700;color:var(--accent,#F5C542)}
 .gal-deck{position:relative;width:100%;max-width:340px;height:440px;margin:0 auto}

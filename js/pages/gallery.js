@@ -54,9 +54,9 @@
       purchasesByGoods: {},
       currentCharId: null,
       search: '',
-      groupMode: 'flat', // 分组模式：flat 平铺 / series 按系列 / type 按品类
+      groupMode: 'flat', // 分组模式：flat 平铺 / type 按品类
       sortMode: false,   // 排序模式：长按卡片拖动重新排列（仅平铺视图）
-      filterCat: '',     // 品类筛选：'' 全部 / 吧唧 / 纸片 / 立牌 / 毛绒 / 其他
+      filterCats: [],    // 品类筛选（多选）：空数组=全部，可同时选多个品类
       swipeMode: false,
       autoOwn: false // 常规图鉴「点亮模式」开关：默认关闭防误触（打开后点击卡片点亮拥有）
     };
@@ -127,7 +127,7 @@
     if (!state.currentCharId) return [];
     return state.items.filter(function (it) {
       if (it.character_id !== state.currentCharId) return false;
-      if (state.filterCat && catOf(it) !== state.filterCat) return false;
+      if (state.filterCats.length && state.filterCats.indexOf(catOf(it)) === -1) return false;
       return true;
     }).sort(byOrder);
   }
@@ -507,16 +507,6 @@
     '</div>';
   }
 
-  function groupBySeriesItems(items) {
-    var map = {}, order = [];
-    items.forEach(function (it) {
-      var key = it.series || '未分组';
-      if (!map[key]) { map[key] = []; order.push(key); }
-      map[key].push(it);
-    });
-    return order.map(function (k) { return { series: k, items: map[k] }; });
-  }
-
   /** 条目 → 五大品类（条目显式 category，未填写默认「其他」） */
   function catOf(it) {
     var c = String(it.category || '').trim();
@@ -544,8 +534,8 @@
       return '<p class="empty-line">还没有图鉴条目，去添加官方谷子</p>';
     }
     var html = '<div class="gal-grid">';
-    if (state.groupMode === 'series' || state.groupMode === 'type') {
-      var groups = state.groupMode === 'series' ? groupBySeriesItems(items) : groupByTypeItems(items);
+    if (state.groupMode === 'type') {
+      var groups = groupByTypeItems(items);
       groups.forEach(function (g) {
         html += '<div class="gal-group"><div class="gal-group-title">' + esc(g.series) + '</div><div class="gal-grid-row' + (state.sortMode ? ' gal-sort-active' : '') + '">';
         g.items.forEach(function (it) { html += itemCardHTML(it); });
@@ -697,8 +687,8 @@
     sortState = null;
   }
 
-  var GROUP_NEXT = { flat: 'series', series: 'type', type: 'flat' };
-  var GROUP_LABEL = { flat: '按系列分组', series: '按品类分组', type: '取消分组' };
+  var GROUP_NEXT = { flat: 'type', type: 'flat' };
+  var GROUP_LABEL = { flat: '按品类分组', type: '取消分组' };
 
   function toolbarHTML() {
     if (state.sortMode) {
@@ -710,16 +700,16 @@
     }
     return '<div class="gal-toolbar">' +
       '<input id="gal-search" class="input" type="text" placeholder="搜索条目名称" value="' + esc(state.search) + '">' +
-      '<div class="gal-cat-filter">' +
-        ['', '吧唧', '纸片', '立牌', '毛绒', '其他'].map(function (c) {
-          var on = state.filterCat === c;
-          return '<button type="button" class="gal-cat-chip' + (on ? ' is-on' : '') + '" data-cat="' + esc(c) + '">' + esc(c || '全部') + '</button>';
-        }).join('') +
-      '</div>' +
       '<div class="gal-toolbar-row">' +
         '<button type="button" class="btn btn--secondary" id="gal-group-btn">' + GROUP_LABEL[state.groupMode] + '</button>' +
         '<button type="button" class="btn btn--secondary" id="gal-sort-btn" title="长按卡片拖动重新排列">排序</button>' +
         '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
+      '</div>' +
+      '<div class="gal-cat-filter">' +
+        ['', '吧唧', '纸片', '立牌', '毛绒', '其他'].map(function (c) {
+          var on = c === '' ? state.filterCats.length === 0 : state.filterCats.indexOf(c) >= 0;
+          return '<button type="button" class="gal-cat-chip' + (on ? ' is-on' : '') + '" data-cat="' + esc(c) + '">' + esc(c || '全部') + '</button>';
+        }).join('') +
       '</div>' +
       '<div class="gal-swipe-opt">' +
         '<label class="switch"><input type="checkbox" id="gal-tap-own"' + (state.autoOwn ? ' checked' : '') + '><span class="switch-track"></span>' +
@@ -881,7 +871,15 @@
     if (gb) pon(gb, 'click', function () { state.groupMode = GROUP_NEXT[state.groupMode]; rerender(); });
     pon(page, 'click', function (e) {
       var chip = e.target.closest('.gal-cat-chip');
-      if (chip) { state.filterCat = chip.dataset.cat; rerender(); }
+      if (chip) {
+        var c = chip.dataset.cat;
+        if (!c) { state.filterCats = []; }
+        else {
+          var idx = state.filterCats.indexOf(c);
+          if (idx >= 0) state.filterCats.splice(idx, 1); else state.filterCats.push(c);
+        }
+        rerender();
+      }
     });
     var sortBtn = document.getElementById('gal-sort-btn');
     if (sortBtn) pon(sortBtn, 'click', function () {

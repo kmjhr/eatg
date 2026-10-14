@@ -551,9 +551,10 @@
   }
 
   // ---- 排序模式：长按卡片拖动重新排列（仅平铺视图）----
-  // 长按 380ms 激活拖动；激活后卡片跟手，按指针落点实时换位；松手按 DOM 顺序
-  // 全量写回 sort_order（0..n-1），其余未排序条目自动排后。
-  var sortState = null; // { row, card, timer, active, startX, startY, moveFn, upFn }
+  // 拖动排序（v2）：排序模式下按住卡片即候选，移动 >8px 自动激活拖动（免长按）；
+  // 激活后卡片跟手（缩放+阴影），按指针落点实时换位，松手按 DOM 顺序全量写回 sort_order（0..n-1）。
+  // 网格区域 touch-action:none 防抢滚动；拖到屏幕上下边缘自动滚动浏览。
+  var sortState = null; // { row, card, active, startX, startY, moveFn, upFn }
 
   function bindSortGrid(page) {
     if (!state.sortMode) return;
@@ -565,32 +566,42 @@
       var card = e.target.closest('.gal-card');
       if (!card || card.parentNode !== row) return;
       var st = {
-        row: row, card: card, timer: null, active: false,
+        row: row, card: card, active: false,
         startX: e.clientX, startY: e.clientY, moveFn: null, upFn: null
       };
       sortState = st;
-      st.timer = setTimeout(function () {
-        if (!sortState || sortState.active) return;
-        activateSortDrag();
-      }, 380);
-      // 未激活前移动 >10px 视为页面滚动，取消排序候选
       st.moveFn = function (ev) {
-        if (!sortState || sortState.active) return;
+        if (sortState !== st || !st.card) return;
+        if (ev.cancelable) ev.preventDefault();
         var dx = ev.clientX - st.startX, dy = ev.clientY - st.startY;
-        if (Math.abs(dx) + Math.abs(dy) > 10) {
-          if (st.timer) { clearTimeout(st.timer); st.timer = null; }
-          sortState = null;
-          document.removeEventListener('pointermove', st.moveFn);
-          document.removeEventListener('pointerup', st.upFn);
-          document.removeEventListener('pointercancel', st.upFn);
+        if (!st.active) {
+          if (Math.abs(dx) + Math.abs(dy) < 8) return; // 未达阈值视为轻点
+          st.active = true;
+          st.card.classList.add('gal-sort-drag');
+          st.card.style.pointerEvents = 'none';
         }
+        st.card.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.04)';
+        swapByPointer(st, ev);
+        autoScroll(ev.clientY);
       };
       st.upFn = function () {
-        if (st.timer) { clearTimeout(st.timer); st.timer = null; }
         if (sortState === st) sortState = null;
         document.removeEventListener('pointermove', st.moveFn);
         document.removeEventListener('pointerup', st.upFn);
         document.removeEventListener('pointercancel', st.upFn);
+        if (!st.card) return;
+        st.card.classList.remove('gal-sort-drag');
+        st.card.style.pointerEvents = '';
+        st.card.style.transform = '';
+        if (!st.active) return;
+        // 按当前 DOM 顺序写回 sort_order
+        var ordered = [];
+        var kids = Array.prototype.slice.call(st.row.children);
+        for (var i = 0; i < kids.length; i++) {
+          var it = state.items.filter(function (x) { return x.id === Number(kids[i].dataset.iid); })[0];
+          if (it) ordered.push(it);
+        }
+        saveOrder(ordered);
       };
       document.addEventListener('pointermove', st.moveFn);
       document.addEventListener('pointerup', st.upFn);
@@ -598,64 +609,40 @@
     });
   }
 
-  function activateSortDrag() {
-    var st = sortState;
-    if (!st) return;
-    st.active = true;
-    st.card.classList.add('gal-sort-drag');
-    st.card.style.pointerEvents = 'none';
-    document.removeEventListener('pointermove', st.moveFn);
-    document.removeEventListener('pointerup', st.upFn);
-    document.removeEventListener('pointercancel', st.upFn);
-    st.moveFn = onSortMove;
-    st.upFn = onSortUp;
-    document.addEventListener('pointermove', st.moveFn);
-    document.addEventListener('pointerup', st.upFn);
-    document.addEventListener('pointercancel', st.upFn);
-  }
-
-  function onSortMove(e) {
-    var st = sortState;
-    if (!st || !st.active) return;
-    if (e.cancelable) e.preventDefault();
-    st.card.style.transform = 'translate3d(' + (e.clientX - st.startX) + 'px,' + (e.clientY - st.startY) + 'px,0)';
+  /** 按指针落点实时换位：指针落在哪张卡片上，按其上下半区插到该卡片前/后 */
+  function swapByPointer(st, ev) {
     var kids = Array.prototype.slice.call(st.row.children);
-    var cur = kids.indexOf(st.card);
-    if (cur < 0) return;
-    var target = cur;
+    if (kids.indexOf(st.card) < 0) return;
     for (var i = 0; i < kids.length; i++) {
       if (kids[i] === st.card) continue;
       var r = kids[i].getBoundingClientRect();
-      if (e.clientY >= r.top && e.clientY <= r.bottom) {
-        target = (e.clientX < r.left + r.width / 2) ? i : i + 1;
-        break;
+      if (ev.clientX >= r.left && ev.clientX <= r.right &&
+          ev.clientY >= r.top && ev.clientY <= r.bottom) {
+        if (ev.clientY < r.top + r.height / 2) {
+          st.row.insertBefore(st.card, kids[i]);
+        } else {
+          st.row.insertBefore(st.card, kids[i].nextSibling);
+        }
+        return;
       }
     }
-    if (target !== cur) {
-      if (target > cur) target = Math.min(target, kids.length - 1);
-      if (kids[target] !== st.card) st.row.insertBefore(st.card, kids[target]);
+    // 指针在卡片间隙：找最近卡片，插到其前面
+    var best = null, bestD = Infinity;
+    for (var j = 0; j < kids.length; j++) {
+      if (kids[j] === st.card) continue;
+      var rr = kids[j].getBoundingClientRect();
+      var d = Math.abs(ev.clientX - (rr.left + rr.width / 2)) + Math.abs(ev.clientY - (rr.top + rr.height / 2));
+      if (d < bestD) { bestD = d; best = kids[j]; }
     }
+    if (best) st.row.insertBefore(st.card, best);
   }
 
-  function onSortUp() {
-    var st = sortState;
-    if (!st) return;
-    document.removeEventListener('pointermove', st.moveFn);
-    document.removeEventListener('pointerup', st.upFn);
-    document.removeEventListener('pointercancel', st.upFn);
-    sortState = null;
-    st.card.classList.remove('gal-sort-drag');
-    st.card.style.pointerEvents = '';
-    st.card.style.transform = '';
-    if (!st.active) return;
-    // 按当前 DOM 顺序写回 sort_order
-    var ordered = [];
-    var kids = Array.prototype.slice.call(st.row.children);
-    for (var i = 0; i < kids.length; i++) {
-      var it = state.items.filter(function (x) { return x.id === Number(kids[i].dataset.iid); })[0];
-      if (it) ordered.push(it);
-    }
-    saveOrder(ordered);
+  /** 拖到屏幕上下边缘自动滚动（页面级），步进 10px */
+  function autoScroll(clientY) {
+    var se = document.scrollingElement || document.documentElement;
+    var edge = 56;
+    if (clientY < edge) se.scrollTop = Math.max(0, se.scrollTop - 10);
+    else if (clientY > window.innerHeight - edge) se.scrollTop += 10;
   }
 
   function saveOrder(ordered) {
@@ -695,7 +682,7 @@
       // 排序模式：专注拖动，其余操作收起
       return '<div class="gal-toolbar">' +
         '<div class="gal-toolbar-row"><button type="button" class="btn btn--primary" id="gal-sort-done">完成排序</button></div>' +
-        '<p class="gal-swipe-opt-tip" style="text-align:center">长按卡片拖动排序 · 松手自动保存</p>' +
+        '<p class="gal-swipe-opt-tip" style="text-align:center">按住卡片拖动换位 · 松手自动保存 · 拖到屏幕上下边缘可滚动</p>' +
       '</div>';
     }
     return '<div class="gal-toolbar">' +
@@ -904,6 +891,7 @@
       if (Date.now() - lastDetailClose < 350) return; // 详情刚关闭，忽略穿透点击
       var card = e.target.closest('.gal-card');
       if (card) {
+        if (state.sortMode) return; // 排序模式下点击卡片不打开详情
         var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
         if (!it) return;
         if (state.autoOwn) {

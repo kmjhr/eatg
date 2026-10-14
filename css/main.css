@@ -1752,6 +1752,9 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .bs-empty-sub{font-size:12px}
 .bs-foot{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0)}
 .bs-foot .btn{flex:1;height:42px;font-size:13px;padding:0 8px;white-space:nowrap}
+/* 弹层内弹出的选图选项行（位于底部按钮上方，不依赖全局抽屉层级） */
+.bs-pick-options{position:absolute;left:0;right:0;bottom:66px;z-index:5;background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0);box-shadow:0 -4px 12px rgba(0,0,0,.08);display:none}
+.bs-pick-options .opt-row:last-child{border-bottom:none}
 
 /* ===== 拍照批量录入：确认页 ===== */
 .page--batch{padding-bottom:96px}

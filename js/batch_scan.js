@@ -100,7 +100,7 @@
       '</div>' +
       '<div class="bs-stage">' +
         '<canvas class="bs-canvas"></canvas>' +
-        '<div class="bs-empty">选择照片后，在此框选每个谷子<br><span class="bs-empty-sub">可点「自动识别数量」让模型先圈一遍</span></div>' +
+        '<div class="bs-empty">点下方「相册 / 拍照」选择照片<br><span class="bs-empty-sub">选图后可框选多个谷子，或点「自动识别数量」先圈一遍</span></div>' +
       '</div>' +
       '<div class="bs-foot">' +
         '<button type="button" class="btn btn--secondary" data-act="pick">相册 / 拍照</button>' +
@@ -112,39 +112,64 @@
     return el;
   }
 
-  // ---- 图片选择（动态 file input，视觉隐藏，兼容 iOS） ----
+  // ---- 图片选择（在弹层内部弹出选项行，避免跨层遮挡；input 覆盖 + 兜底 JS click 双保险） ----
 
-  function pickImage() {
-    return new Promise(function (resolve) {
-      var ref = UI.sheet({
-        title: '选择照片',
-        bodyHTML: '<div class="opt-list">' +
-          '<span class="opt-row opt-row--file" data-src="camera">' +
-            '<button type="button" class="opt-row-btn">拍照</button>' +
-            '<input type="file" class="input-cover" accept="image/*" capture="environment" data-src="camera">' +
-            '<span class="opt-check">›</span></span>' +
-          '<span class="opt-row opt-row--file" data-src="album">' +
-            '<button type="button" class="opt-row-btn">从相册选择</button>' +
-            '<input type="file" class="input-cover" accept="image/*" data-src="album">' +
-            '<span class="opt-check">›</span></span>' +
-          '</div>'
-      });
-      // 通道1：input 覆盖按钮真实触摸弹选择器；通道2：覆盖失效时点击按钮兜底 JS click。两路互斥不重复。
-      ref.body.addEventListener('change', function (e) {
+  function loadFile(file) {
+    if (!file || !view || view.destroyed) return;
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      if (view && view.destroyed) return;
+      view.img = img;
+      var fr = fitRect(img.naturalWidth, img.naturalHeight, view.canvas.clientWidth, view.canvas.clientHeight);
+      view.fit = fr;
+      view.canvas.width = view.canvas.clientWidth;
+      view.canvas.height = view.canvas.clientHeight;
+      view.boxes = [];
+      view.sel = -1;
+      var empty = view.el.querySelector('.bs-empty');
+      if (empty) empty.style.display = 'none';
+      var opts = view.el.querySelector('.bs-pick-options');
+      if (opts) opts.style.display = 'none';
+      draw();
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); UI.toast('图片读取失败', 'error'); };
+    img.src = url;
+  }
+
+  function showPickOptions() {
+    if (!view || view.destroyed) return;
+    var opts = view.el.querySelector('.bs-pick-options');
+    if (!opts) {
+      opts = document.createElement('div');
+      opts.className = 'bs-pick-options';
+      opts.innerHTML = '<div class="opt-list">' +
+        '<span class="opt-row opt-row--file" data-src="camera">' +
+          '<button type="button" class="opt-row-btn">拍照</button>' +
+          '<input type="file" class="input-cover" accept="image/*" capture="environment">' +
+          '<span class="opt-check">›</span></span>' +
+        '<span class="opt-row opt-row--file" data-src="album">' +
+          '<button type="button" class="opt-row-btn">从相册选择</button>' +
+          '<input type="file" class="input-cover" accept="image/*" multiple>' +
+          '<span class="opt-check">›</span></span>' +
+        '</div>';
+      view.el.appendChild(opts);
+      // 通道1：input 覆盖真实触摸；通道2：覆盖失效时按钮兜底 JS click（两路互斥）
+      opts.addEventListener('change', function (e) {
         var inp = e.target.closest('input[type=file]');
         if (!inp) return;
-        var f = inp.files && inp.files[0];
-        ref.close();
-        resolve(f || null);
+        loadFile(inp.files && inp.files[0]);
       });
-      ref.body.addEventListener('click', function (e) {
+      opts.addEventListener('click', function (e) {
         var row = e.target.closest('.opt-row--file');
         if (!row) return;
         var inp = row.querySelector('input[type=file]');
         if (!inp || e.target === inp) return;
         try { inp.click(); } catch (err) { console.error('[EATG] 选图兜底失败', err); }
       });
-    });
+    }
+    opts.style.display = 'block';
   }
 
   // ---- 画布：框编辑 ----
@@ -416,27 +441,7 @@
     var ctx = view.canvas.getContext('2d');
     view.ctx = ctx;
 
-    pickImage().then(function (file) {
-      if (!file) { close(); return; }
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () {
-        URL.revokeObjectURL(url);
-        if (view && view.destroyed) return;
-        view.img = img;
-        var fr = fitRect(img.naturalWidth, img.naturalHeight, view.canvas.clientWidth, view.canvas.clientHeight);
-        view.fit = fr;
-        view.canvas.width = view.canvas.clientWidth;
-        view.canvas.height = view.canvas.clientHeight;
-        view.boxes = [];
-        view.sel = -1;
-        var empty = view.el.querySelector('.bs-empty');
-        if (empty) empty.style.display = 'none';
-        draw();
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); UI.toast('图片读取失败', 'error'); };
-      img.src = url;
-    });
+    // 不自动弹选择层（避免跨层遮挡）；由用户点「相册 / 拍照」在弹层内弹出选项
 
     // 载入词表（角色/IP 枚举，用于预填匹配）
     S.getAll('characters').then(function (chars) {
@@ -460,10 +465,8 @@
       var b = e.target.closest('[data-act]');
       if (!b) return;
       if (b.dataset.act === 'close') close();
-      else if (b.dataset.act === 'pick') {
-        close();
-        BS.open();
-      } else if (b.dataset.act === 'auto') autoDetect();
+      else if (b.dataset.act === 'pick') showPickOptions();
+      else if (b.dataset.act === 'auto') autoDetect();
       else if (b.dataset.act === 'del-box') {
         if (view && view.sel >= 0) {
           view.boxes.splice(view.sel, 1);

@@ -1,10 +1,9 @@
 /* ==========================================================================
-   一咕（EATG）· 愿望清单（js/pages/wishlist.js）
-   实现：《页面线框与UI规范》P17 + 《业务规则》§10
+   一咕（EATG）· 愿望中心（js/pages/wishlist.js）
    路由：#/wishlist
-   内容：1 列表：想买资讯（名称/IP角色/开订/出荷/参考价），按开订时间升序
-        2 操作：标记已订（转收藏库预填）、移除（status→normal）、编辑提醒时间
-   数据：愿望清单 = news 表中 status='wish' 的条目
+   概念：想买就是收藏 —— 收藏集合 = 资讯中 is_fav 或 status='wish' 的条目（去重）
+   内容：1 列表：收藏的资讯（名称/IP角色/开订/出荷/参考价/状态），按开订时间升序
+        2 操作：标记已订（转收藏库预填）、改提醒、移除（移出收藏）
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -27,13 +26,20 @@
   function esc(s) { return UI.esc(s == null ? '' : String(s)); }
 
   function resetState() {
-    state = { destroyed: false, items: [], charsById: {} };
+    state = { destroyed: false, list: [], charsById: {} };
   }
 
   function load() {
     return Promise.all([S.getAll('news'), S.getAll('characters')]).then(function (r) {
-      state.items = (r[0] || []).filter(function (n) { return n.status === 'wish'; })
-        .sort(function (a, b) { return (a.preorder_time || '9999').localeCompare(b.preorder_time || '9999'); });
+      var all = r[0] || [];
+      var seen = {}, list = [];
+      all.forEach(function (n) {
+        if (!n) return;
+        if (n.is_fav || n.status === 'wish') {
+          if (!seen[n.id]) { seen[n.id] = 1; list.push(n); }
+        }
+      });
+      state.list = list.sort(function (a, b) { return (a.preorder_time || '9999').localeCompare(b.preorder_time || '9999'); });
       state.charsById = {};
       (r[1] || []).forEach(function (c) { state.charsById[c.id] = c; });
     });
@@ -42,6 +48,13 @@
   function charNames(ids) {
     if (!ids || !ids.length) return '';
     return ids.map(function (id) { var c = state.charsById[id]; return c ? c.name : ''; }).filter(Boolean).join('、');
+  }
+
+  function statusBadge(n) {
+    if (n.status === 'wish') return '<span class="tag tag--wish">想买</span>';
+    if (n.status === 'ordered') return '<span class="tag tag--ordered">已订</span>';
+    if (n.status === 'ignored') return '<span class="tag tag--ignored">已忽略</span>';
+    return '';
   }
 
   function itemHTML(n) {
@@ -53,6 +66,7 @@
           '<div class="wl-info">' +
             '<div class="wl-title">' + esc(n.title) + '</div>' +
             '<div class="wl-meta">' +
+              statusBadge(n) +
               (n.ip ? '<span class="tag tag--ip">' + esc(n.ip) + '</span>' : '') +
               (chars ? '<span class="tag">' + esc(chars) + '</span>' : '') +
             '</div>' +
@@ -72,11 +86,21 @@
     '</div>';
   }
 
-  function pageHTML() {
-    if (!state.items.length) {
-      return '<div class="page-scroll" id="wl-page"><p class="empty-line">愿望清单为空，去资讯页把想买的谷子加入吧～</p></div>';
+  function listHTML() {
+    if (!state.list.length) {
+      return '<p class="empty-line">收藏为空，去资讯页点「想买」或左滑收藏 ♥ 加入吧～</p>';
     }
-    return '<div class="page-scroll" id="wl-page"><div class="wl-list">' + state.items.map(itemHTML).join('') + '</div></div>';
+    return '<div class="wl-head-bar">收藏（想买）<span class="num">' + state.list.length + '</span></div>' +
+      '<div class="wl-list">' + state.list.map(itemHTML).join('') + '</div>';
+  }
+
+  function pageHTML() {
+    return '<div class="page-scroll" id="wl-page">' + listHTML() + '</div>';
+  }
+
+  function findN(nid) {
+    for (var i = 0; i < state.list.length; i++) { if (state.list[i].id === nid) return state.list[i]; }
+    return null;
   }
 
   function go(hash) { if (EATG.app && EATG.app.navigate) EATG.app.navigate(hash); }
@@ -100,7 +124,7 @@
   }
 
   function doOrder(nid) {
-    var n = state.items.filter(function (x) { return x.id === nid; })[0];
+    var n = findN(nid);
     if (!n) return;
     n.status = 'ordered';
     n.is_read = true;
@@ -119,18 +143,19 @@
   }
 
   function doRemove(nid) {
-    var n = state.items.filter(function (x) { return x.id === nid; })[0];
+    var n = findN(nid);
     if (!n) return;
     n.status = 'normal';
+    n.is_fav = false;
     S.put('news', n).then(function () {
-      UI.toast('已移出愿望清单', 'success');
-      state.items = state.items.filter(function (x) { return x.id !== nid; });
+      UI.toast('已移出收藏', 'success');
+      state.list = state.list.filter(function (x) { return x.id !== nid; });
       render();
     }).catch(function () { UI.toast('操作失败', 'error'); });
   }
 
   function editRemind(nid) {
-    var n = state.items.filter(function (x) { return x.id === nid; })[0];
+    var n = findN(nid);
     if (!n) return;
     var body = '<div class="field"><div class="field-head"><label class="field-label">开订提醒时间</label></div>' +
       '<input id="wl-preorder" class="input" type="date" value="' + esc(n.preorder_time || '') + '"></div>' +
@@ -153,7 +178,7 @@
     resetState();
     dom = { container: container };
     container.innerHTML = '<div class="loading">加载中…</div>';
-    ctx.setTitle('愿望清单');
+    ctx.setTitle('愿望中心');
     ctx.setBack(true);
     ctx.setActiveTab('news');
     return load().then(function () {
@@ -161,7 +186,7 @@
       render();
     }).catch(function (err) {
       if (state.destroyed) return;
-      if (!(err && err.expected)) console.error('[EATG] 愿望清单加载失败', err);
+      if (!(err && err.expected)) console.error('[EATG] 愿望中心加载失败', err);
       UI.toast('加载失败：' + (err && err.message || err), 'error');
     });
   }

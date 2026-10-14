@@ -242,7 +242,7 @@
     }).then(function () {
       var idx = state.news.findIndex(function (x) { return x.id === nid; });
       if (idx >= 0) { state.news[idx].status = status; state.news[idx].is_read = true; }
-      UI.toast(status === 'wish' ? '已加入愿望清单' : '已标记已订', 'success');
+      UI.toast(status === 'wish' ? '已加入收藏（想买）' : '已标记已订', 'success');
       rerender();
     });
   }
@@ -265,7 +265,19 @@
     });
   }
 
-  function doWish(nid) { setStatus(nid, 'wish'); }
+  /** 想买就是收藏：标记想买的同时自动收藏（愿望中心统一为收藏） */
+  function doWish(nid) {
+    setStatus(nid, 'wish').then(function () {
+      return S.get('news', nid).then(function (n) {
+        if (!n || n.is_fav) return;
+        n.is_fav = true;
+        return S.put('news', n);
+      });
+    }).then(function () {
+      var idx = state.news.findIndex(function (x) { return x.id === nid; });
+      if (idx >= 0) state.news[idx].is_fav = true;
+    }).catch(function () { /* 已收藏则静默 */ });
+  }
 
   /** 删除一条资讯；收藏（is_fav）的受保护，先取消收藏才能删 */
   function doDelete(nid) {

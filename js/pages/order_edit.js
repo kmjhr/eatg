@@ -184,7 +184,8 @@
       }).join('');
     var img = state.orderImage
       ? '<div class="order-img"><img src="' + state.orderImage + '" alt=""><button type="button" class="cell-del" data-act="rm-img" aria-label="移除截图">×</button></div>'
-      : '<button type="button" class="order-img-add" data-act="add-img">＋<span>订单截图</span></button>';
+      : '<label class="order-img-add" style="position:relative">＋<span>订单截图</span>' +
+        '<input type="file" id="o-file" class="input-cover" accept="image/*"></label>';
     return '<div class="form-section">' +
       '<h2 class="section-title">订单信息</h2>' +
       '<div class="field"><div class="field-head"><label class="field-label" for="o-name">订单名称</label></div>' +
@@ -304,7 +305,6 @@
   function pageHTML() {
     return '<section class="page page--order">' +
       infoHTML() + amountHTML() + splitHTML() + itemsHTML() + balanceHTML() + actionsHTML() +
-      '<input type="file" id="o-file" class="file-hidden" accept="image/*">' +
       '</section>';
   }
 
@@ -737,7 +737,6 @@
       if (a === 'goto-goods') { go('#/goods/detail?id=' + act.dataset.gid); return; }
       if (a === 'apply-split') { applySplit(); return; }
       if (a === 'apply-body') { applyBodySplit(); return; }
-      if (a === 'add-img') { if (dom.file) dom.file.click(); return; }
       if (a === 'rm-img') { syncInputs(); state.orderImage = null; render(); UI.toast('已移除截图', 'success'); return; }
       if (a === 'add-channel') { onAddChannel(); return; }
       if (a === 'save') { doSave(); return; }

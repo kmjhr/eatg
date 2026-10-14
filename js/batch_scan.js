@@ -119,26 +119,21 @@
       var ref = UI.sheet({
         title: '选择照片',
         bodyHTML: '<div class="opt-list">' +
-          '<button type="button" class="opt-row" data-src="camera"><span>拍照</span><span class="opt-check">›</span></button>' +
-          '<button type="button" class="opt-row" data-src="album"><span>从相册选择</span><span class="opt-check">›</span></button>' +
+          '<label class="opt-row" data-src="camera">' +
+            '<input type="file" class="input-cover" accept="image/*" capture="environment" data-src="camera">' +
+            '<span>拍照</span><span class="opt-check">›</span></label>' +
+          '<label class="opt-row" data-src="album">' +
+            '<input type="file" class="input-cover" accept="image/*" data-src="album">' +
+            '<span>从相册选择</span><span class="opt-check">›</span></label>' +
           '</div>'
       });
-      ref.body.addEventListener('click', function (e) {
-        var b = e.target.closest('[data-src]');
-        if (!b) return;
+      // 用户真实触摸 input 触发 change（不依赖 JS click，微信/TWA/WebView 均放行）
+      ref.body.addEventListener('change', function (e) {
+        var inp = e.target.closest('input[data-src]');
+        if (!inp) return;
+        var f = inp.files && inp.files[0];
         ref.close();
-        var input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.className = 'file-hidden';
-        if (b.dataset.src === 'camera') input.setAttribute('capture', 'environment');
-        document.body.appendChild(input);
-        input.addEventListener('change', function () {
-          var f = input.files && input.files[0];
-          input.remove();
-          resolve(f || null);
-        });
-        input.click();
+        resolve(f || null);
       });
     });
   }

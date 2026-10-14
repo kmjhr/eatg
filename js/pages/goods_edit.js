@@ -598,16 +598,20 @@
     var ref = UI.sheet({
       title: '添加图片',
       bodyHTML: '<div class="opt-list">' +
-        '<button type="button" class="opt-row" data-src="camera"><span>拍照</span><span class="opt-check">›</span></button>' +
-        '<button type="button" class="opt-row" data-src="album"><span>从相册选择</span><span class="opt-check">›</span></button>' +
+        '<label class="opt-row" data-src="camera">' +
+          '<input type="file" class="input-cover" accept="image/*" capture="environment" data-src="camera">' +
+          '<span>拍照</span><span class="opt-check">›</span></label>' +
+        '<label class="opt-row" data-src="album">' +
+          '<input type="file" class="input-cover" accept="image/*" multiple data-src="album">' +
+          '<span>从相册选择</span><span class="opt-check">›</span></label>' +
         '</div>'
     });
-    ref.body.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-src]');
-      if (!b) return;
+    // 用户真实触摸 input 触发 change（不依赖 JS click，微信/TWA/WebView 均放行）
+    ref.body.addEventListener('change', function (e) {
+      var inp = e.target.closest('input[data-src]');
+      if (!inp) return;
       ref.close();
-      if (b.dataset.src === 'camera') dom.camera.click();
-      else dom.album.click();
+      handleFiles(inp.files, inp);
     });
   }
 

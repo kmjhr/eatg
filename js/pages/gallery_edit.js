@@ -87,8 +87,8 @@
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
           '<div class="ge-img-row">' +
             (it.image ? '<img class="ge-img" src="' + esc(it.image) + '">' : '<div class="ge-img ge-img--ph">无图</div>') +
-            '<input type="file" id="ge-img-input" class="file-hidden" accept="image/*">' +
-            '<button type="button" class="btn btn--secondary" id="ge-img-btn">选择图片</button>' +
+            '<label class="btn btn--secondary" id="ge-img-btn" style="position:relative">选择图片' +
+              '<input type="file" id="ge-img-input" class="input-cover" accept="image/*"></label>' +
             (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-clear">清除</button>' : '') +
           '</div></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">关联谷子款（可选）</label></div>' +
@@ -120,7 +120,7 @@
   }
 
   function bind(ctx) {
-    on(dom.imgBtn, 'click', function () { dom.imgInput.click(); });
+    // 图片选择：input 覆盖在按钮上，真实触摸触发（不依赖 JS click，微信/TWA/WebView 均放行）
     on(dom.imgInput, 'change', function () {
       var f = dom.imgInput.files[0];
       if (!f) return;

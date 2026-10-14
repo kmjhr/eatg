@@ -696,6 +696,7 @@ html[data-theme='dark'] .thumb-ph { background: linear-gradient(135deg, #2A2A2A,
 .opt-chip.is-fav::before { content: '★ '; color: var(--warn); }
 .opt-list { display: flex; flex-direction: column; }
 .opt-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -703,6 +704,8 @@ html[data-theme='dark'] .thumb-ph { background: linear-gradient(135deg, #2A2A2A,
   font-size: 15px;
   border-bottom: 1px solid var(--line);
 }
+/* 透明覆盖式文件选择：input 覆盖在按钮上，用户触摸即真实点击 input（微信/TWA/WebView 均放行，不依赖 JS click） */
+.input-cover{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2}
 .opt-row:last-child { border-bottom: 0; }
 .opt-row .opt-check { visibility: hidden; font-weight: 700; color: #B99430; }
 .opt-row.is-on .opt-check { visibility: visible; }

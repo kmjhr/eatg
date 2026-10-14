@@ -76,7 +76,8 @@
       last_backup_at: null,
       auto_backup_remind: S.SETTINGS_DEFAULTS.auto_backup_remind,
       enums: {},
-      quickWords: {}
+      quickWords: {},
+      characters: []
     };
     EXPORT_DIMS.forEach(function (d) { state.dims[d.key] = true; });
   }
@@ -85,7 +86,8 @@
     return Promise.all([
       S.getSetting('last_backup_at'),
       S.getSetting('auto_backup_remind'),
-      S.getAll('enums')
+      S.getAll('enums'),
+      S.getAll('characters')
     ]).then(function (r) {
       state.last_backup_at = r[0] || null;
       state.auto_backup_remind = r[1] || S.SETTINGS_DEFAULTS.auto_backup_remind;
@@ -93,6 +95,7 @@
       (r[2] || []).forEach(function (row) { enumsMap[row.key] = row.values || []; });
       state.enums = enumsMap;
       state.quickWords = loadQuickWordsMerged();
+      state.characters = r[3] || [];
     });
   }
 
@@ -356,6 +359,83 @@
     '</div>';
   }
 
+  /** 角色管理：谷子详情角色字段（characters store），与图鉴分类独立 */
+  function charsHTML() {
+    var chars = state.characters || [];
+    var chips = chars.map(function (c, i) {
+      var tag = c.gallery === false ? '<i class="dm-chip-tag">谷子</i>' : (c.gallery ? '<i class="dm-chip-tag dm-chip-tag--gal">图鉴</i>' : '');
+      return '<span class="dm-chip">' +
+        '<button type="button" class="dm-chip-word" data-act="edit-char" data-i="' + i + '">' + esc(c.name) + tag + '</button>' +
+        '<button type="button" class="dm-chip-x" data-act="del-char" data-i="' + i + '">×</button></span>';
+    }).join('');
+    return '<div class="dm-section">' +
+      '<div class="dm-section-title">角色</div>' +
+      '<p class="dm-note">谷子详情的角色字段选项；「图鉴」= 显示在图鉴分类，「谷子」= 仅谷子侧使用。删除角色会同时从图鉴移除并删除其图鉴条目。</p>' +
+      '<div class="dm-group">' +
+        '<div class="dm-chips">' + (chips || '<span class="muted">暂无角色</span>') + '</div>' +
+        '<div class="dm-add-row"><input class="input" id="char-add" type="text" autocomplete="off" placeholder="新增角色名">' +
+        '<button type="button" class="btn btn--sm" data-act="add-char">添加</button></div>' +
+      '</div>' +
+    '</div>';
+  }
+  function addChar() {
+    var input = document.getElementById('char-add');
+    var v = input ? input.value.trim() : '';
+    if (!v) { UI.toast('请输入角色名', 'error'); return; }
+    if (state.characters.some(function (c) { return c.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
+    S.add('characters', { name: v, ip: '其他', is_favorite: false, gallery: false }).then(function (id) {
+      state.characters.push({ id: Number(id), name: v, ip: '其他', is_favorite: false, gallery: false });
+      UI.toast('已添加角色（谷子侧）', 'success'); rerender();
+    }).catch(function () { UI.toast('保存失败', 'error'); });
+  }
+  function delChar(i) {
+    var c = state.characters[i];
+    if (!c) return;
+    UI.confirmDialog({
+      title: '删除角色',
+      message: '删除「' + c.name + '」？谷子中引用该角色的将不再显示名字；图鉴分类与条目也会一并移除。',
+      confirmText: '删除',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      S.del('characters', c.id).then(function () {
+        return S.getAll('gallery_items').then(function (items) {
+          var dels = (items || []).filter(function (it) { return it.character_id === c.id; });
+          var p = Promise.resolve();
+          dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
+          return p;
+        });
+      }).then(function () {
+        UI.toast('已删除', 'success');
+        state.characters.splice(i, 1);
+        rerender();
+      }).catch(function () { UI.toast('删除失败', 'error'); });
+    });
+  }
+  function editChar(i) {
+    var c = state.characters[i];
+    if (!c) return;
+    var ref = UI.sheet({
+      title: '编辑角色',
+      bodyHTML: '<input class="input" id="char-edit-input" autocomplete="off" value="' + esc(c.name) + '">',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+        '<button type="button" class="btn btn--primary" data-act="ok">保存</button>'
+    });
+    var input = ref.body.querySelector('#char-edit-input');
+    if (input) setTimeout(function () { input.focus(); }, 0);
+    if (ref.foot) ref.foot.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act !== 'ok') { ref.close(); return; }
+      var v = input ? input.value.trim() : '';
+      if (!v) { UI.toast('内容不能为空', 'error'); return; }
+      if (state.characters.some(function (x) { return x.id !== c.id && x.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
+      c.name = v;
+      S.put('characters', c).then(function () { UI.toast('已保存', 'success'); ref.close(); rerender(); })
+        .catch(function () { UI.toast('保存失败', 'error'); });
+    });
+  }
+
   function quickHTML() {
     return '<div class="dm-section">' +
       '<div class="dm-section-title">快捷词</div>' +
@@ -491,6 +571,9 @@
     if (a === 'add-qw') { addQW(b.dataset.field); return; }
     if (a === 'del-qw') { delQW(b.dataset.field, Number(b.dataset.i)); return; }
     if (a === 'edit-qw') { editQW(b.dataset.field, Number(b.dataset.i)); return; }
+    if (a === 'add-char') { addChar(); return; }
+    if (a === 'del-char') { delChar(Number(b.dataset.i)); return; }
+    if (a === 'edit-char') { editChar(Number(b.dataset.i)); return; }
   }
 
   function dimCheckboxes() {
@@ -533,6 +616,7 @@
       '</div>' +
 
       enumsHTML() +
+      charsHTML() +
       quickHTML() +
 
       '<div class="dm-footer">所有数据仅存于本机浏览器，不上传服务器。</div>' +

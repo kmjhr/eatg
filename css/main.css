@@ -1189,13 +1189,15 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
   max-width: var(--max-w);
   margin: 0 auto;
   display: flex;
+  flex-wrap: wrap; /* 按钮多时换行，文字不溢出 */
+  gap: 8px;
   align-items: center;
   gap: 10px;
   padding: 10px var(--pad-page) calc(10px + env(safe-area-inset-bottom, 0));
   background: var(--card);
   border-top: 1px solid var(--line);
 }
-.detail-actions .btn { flex: 1 1 0; height: 40px; }
+.detail-actions .btn { flex: 1 1 40%; min-width: 110px; height: 40px; white-space: nowrap; }
 
 /* 状态流转菜单行尾标记 */
 .opt-kind { font-size: 12px; color: var(--ink-3); }
@@ -1593,6 +1595,8 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 /* ===== 图鉴 P09/P10 ===== */
 .gal-char-scroll{display:flex;gap:10px;overflow-x:auto;padding:12px 12px 4px;scrollbar-width:none}
 .gal-char-scroll::-webkit-scrollbar{display:none}
+.gal-char-chip{position:relative}
+.gal-char-del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--danger,#E5484D);color:#fff;font-size:12px;line-height:18px;text-align:center;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .gal-char-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;cursor:pointer;opacity:.6}
 .gal-char-chip.is-active{opacity:1}
 .gal-char-chip.is-active .gal-char-name{color:var(--accent,#FFDD88);font-weight:700}

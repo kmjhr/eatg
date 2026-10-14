@@ -87,7 +87,8 @@
       S.getAll('goods'),
       S.getAll('purchase_items')
     ]).then(function (r) {
-      state.characters = r[0] || [];
+      // 图鉴角色独立：只显示 gallery!==false 的角色（谷子侧新增角色不进图鉴）
+      state.characters = (r[0] || []).filter(function (c) { return c.gallery !== false; });
       state.items = r[1] || [];
       state.goodsById = {};
       (r[2] || []).forEach(function (g) { state.goodsById[g.id] = g; });
@@ -181,6 +182,7 @@
     maxVisible: 3      // 堆叠可见层数（含顶层）
   };
   var deck = null;
+  var lastDetailClose = 0; // 详情关闭时间戳：关闭后短暂忽略卡片点击，防止连点又弹开
 
   function resetDeck() {
     deck = { items: [], pos: 0, history: [], top: null, locked: false, drag: null, suppressTap: false };
@@ -460,6 +462,7 @@
         return '<div class="gal-char-chip' + (on ? ' is-active' : '') + '" data-cid="' + c.id + '">' +
           (c.avatar ? '<img class="gal-avatar" src="' + esc(c.avatar) + '">' : '<div class="gal-avatar gal-avatar--ph">' + esc((c.name || '?').charAt(0)) + '</div>') +
           '<span class="gal-char-name">' + esc(c.name) + '</span>' +
+          '<button type="button" class="gal-char-del" data-char-del="' + c.id + '" aria-label="删除角色">×</button>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -597,9 +600,12 @@
       '<button type="button" class="btn btn--danger" data-act="del">删除</button>' +
     '</div>';
     var ref = UI.sheet({ title: '图鉴条目', bodyHTML: body });
+    // 关闭时记录时间，屏蔽随后的卡片连点（避免“关了好几次还弹”）
+    var _close = ref.close;
+    ref.close = function () { lastDetailClose = Date.now(); _close(); };
     ref.body.addEventListener('click', function (e) {
       var act = e.target.closest('[data-act]');
-      if (!act) return;
+      if (!act) { ref.close(); return; } // 点详情空白区域也可关闭
       var a = act.dataset.act;
       if (a === 'edit') { ref.close(); go('#/gallery/edit?id=' + item.id); }
       else if (a === 'add-goods') {
@@ -645,11 +651,42 @@
       var name = document.getElementById('nc-name').value.trim();
       var ip = document.getElementById('nc-ip').value.trim();
       if (!name) { UI.toast('请填写角色名', 'error'); return; }
-      S.add('characters', { name: name, ip: ip || '', is_favorite: state.characters.length === 0 }).then(function (id) {
+      S.add('characters', { name: name, ip: ip || '', gallery: true, is_favorite: state.characters.length === 0 }).then(function (id) {
         state.currentCharId = Number(id);
         UI.toast('已添加角色', 'success');
         ref.close();
         reload();
+      });
+    });
+  }
+
+  /** 删除图鉴角色：从图鉴隐藏（gallery=false）+ 删除其全部图鉴条目；谷子库记录不受影响 */
+  function delGalleryChar(cid) {
+    var c = state.characters.filter(function (x) { return x.id === cid; })[0];
+    if (!c) return;
+    UI.confirmDialog({
+      title: '删除图鉴角色',
+      message: '删除「' + c.name + '」？将从图鉴移除该角色和它的全部图鉴条目（谷子库记录不受影响）。',
+      confirmText: '删除',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      c.gallery = false;
+      return S.put('characters', c).then(function () {
+        return S.getAll('gallery_items').then(function (items) {
+          var dels = (items || []).filter(function (it) { return it.character_id === cid; });
+          var p = Promise.resolve();
+          dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
+          return p;
+        });
+      }).then(function () {
+        UI.toast('已删除「' + c.name + '」', 'success');
+        if (state.currentCharId === cid) {
+          var rest = state.characters.filter(function (x) { return x.id !== cid; });
+          state.currentCharId = (rest[0] || {}).id || null;
+        }
+        state.characters = state.characters.filter(function (x) { return x.id !== cid; });
+        rerender();
       });
     });
   }
@@ -679,6 +716,8 @@
     var page = document.getElementById('gallery-page');
     if (!page) return;
     on(page.querySelector('#gal-char-scroll'), 'click', function (e) {
+      var del = e.target.closest('[data-char-del]');
+      if (del) { delGalleryChar(Number(del.dataset.charDel)); return; }
       var chip = e.target.closest('.gal-char-chip');
       if (chip) { state.currentCharId = Number(chip.dataset.cid); rerender(); }
     });
@@ -698,6 +737,7 @@
       rerender();
     });
     on(page, 'click', function (e) {
+      if (Date.now() - lastDetailClose < 350) return; // 详情刚关闭，忽略穿透点击
       var card = e.target.closest('.gal-card');
       if (card) {
         var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
@@ -723,6 +763,7 @@
         return;
       }
       if (deck.suppressTap || deck.locked) return;
+      if (Date.now() - lastDetailClose < 350) return; // 详情刚关闭，忽略穿透点击
       var card = e.target.closest('.gal-deck-card');
       if (!card || card !== deck.top) return;
       var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];

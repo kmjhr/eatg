@@ -755,8 +755,8 @@
       var ip = (dom.ip && dom.ip.value) || '其他';
       askText({ title: '新增角色', placeholder: '角色名', hint: '将归入当前 IP：' + ip }).then(function (name) {
         if (!name) return;
-        S.add('characters', { name: name, ip: ip, is_favorite: false }).then(function (id) {
-          state.characters.push({ id: Number(id), name: name, ip: ip, is_favorite: false });
+        S.add('characters', { name: name, ip: ip, is_favorite: false, gallery: false }).then(function (id) {
+          state.characters.push({ id: Number(id), name: name, ip: ip, is_favorite: false, gallery: false });
           state.characterIds.push(Number(id));
           renderChars();
           UI.toast('已新增角色：' + name, 'success');

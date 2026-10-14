@@ -32,6 +32,12 @@
 
   function on(el, ev, fn, opt) { if (!el) return; el.addEventListener(ev, fn, opt); offs.push([el, ev, fn, opt]); }
   function clearOffs() { offs.forEach(function (t) { t[0].removeEventListener(t[1], t[2], t[3]); }); offs = []; }
+  // 页内监听：绑定在 #gallery-page 内元素上的监听。rerender 会重建页内 DOM，
+  // 必须在每次 bindInner 前回收，否则监听器逐次累加：一次点击触发 N 次，
+  // 「点亮」被翻转偶数次等于没变（功能失效），并重复触发重绘/提示（刷屏）。
+  var pageOffs = [];
+  function pon(el, ev, fn, opt) { if (!el) return; el.addEventListener(ev, fn, opt); pageOffs.push([el, ev, fn, opt]); }
+  function clearPageOffs() { pageOffs.forEach(function (t) { t[0].removeEventListener(t[1], t[2], t[3]); }); pageOffs = []; }
   function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
   function esc(s) { return UI.esc(s == null ? '' : String(s)); }
   function clone(o) { var r = {}; for (var k in o) { if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; } return r; }
@@ -284,7 +290,7 @@
   function bindDeckGestures() {
     var deckEl = document.getElementById('gal-deck');
     if (!deckEl) return;
-    on(deckEl, 'pointerdown', onDeckDown);
+    pon(deckEl, 'pointerdown', onDeckDown);
   }
 
   function onDeckDown(e) {
@@ -701,7 +707,8 @@
   function bindInner() {
     var page = document.getElementById('gallery-page');
     if (!page) return;
-    on(page.querySelector('#gal-char-scroll'), 'click', function (e) {
+    clearPageOffs(); // 回收上一次页内监听，避免重复绑定（点亮翻转偶数次失效 / 提示刷屏）
+    pon(page.querySelector('#gal-char-scroll'), 'click', function (e) {
       var del = e.target.closest('[data-char-del]');
       if (del) { delGalleryChar(Number(del.dataset.charDel)); return; }
       var chip = e.target.closest('.gal-char-chip');
@@ -713,18 +720,18 @@
       return;
     }
     var search = document.getElementById('gal-search');
-    if (search) on(search, 'input', function () { state.search = search.value; rerender(); });
+    if (search) pon(search, 'input', function () { state.search = search.value; rerender(); });
     var gb = document.getElementById('gal-group-btn');
-    if (gb) on(gb, 'click', function () { state.groupBySeries = !state.groupBySeries; rerender(); });
+    if (gb) pon(gb, 'click', function () { state.groupBySeries = !state.groupBySeries; rerender(); });
     var swBtn = document.getElementById('gal-swipe-btn');
-    if (swBtn) on(swBtn, 'click', function () {
+    if (swBtn) pon(swBtn, 'click', function () {
       if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
       state.swipeMode = true;
       rerender();
     });
     var to = document.getElementById('gal-tap-own');
-    if (to) on(to, 'change', function () { state.autoOwn = to.checked; });
-    on(page, 'click', function (e) {
+    if (to) pon(to, 'change', function () { state.autoOwn = to.checked; });
+    pon(page, 'click', function (e) {
       if (Date.now() - lastDetailClose < 350) return; // 详情刚关闭，忽略穿透点击
       var card = e.target.closest('.gal-card');
       if (card) {
@@ -744,7 +751,7 @@
 
   // ---- 刷卡模式：顶部控制条 + 底部按钮 + 点击详情 ----
   function bindSwipeControls(page) {
-    on(page, 'click', function (e) {
+    pon(page, 'click', function (e) {
       if (e.target.closest('.gal-deck-stamp')) return;
       var btn = e.target.closest('button[id]');
       if (btn) {
@@ -806,6 +813,7 @@
   function unmount() {
     if (state) state.destroyed = true;
     if (deck && deck.drag) cancelDeckDrag();
+    clearPageOffs();
     clearOffs();
   }
 

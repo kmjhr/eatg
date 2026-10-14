@@ -164,6 +164,234 @@
   U.fmtMoney = fmtMoney;
   U.compressImage = compressImage;
 
+  // ---- 图片编辑器（旋转 + 裁剪，纯 Canvas，无外部依赖） ----
+  // openImageEditor(dataUrl) → Promise<dataUrl|null>（null = 取消/未改动）
+  // 裁剪比例：自由 / 1:1 / 3:4；输出自动压缩到长边 ≤1920、≤约800KB。
+
+  function dataUrlToBlob(dataUrl) {
+    var i = dataUrl.indexOf(',');
+    var meta = dataUrl.slice(0, i);
+    var b64 = dataUrl.slice(i + 1);
+    var m = /^data:([^;]+)/.exec(meta);
+    var mime = m ? m[1] : 'image/jpeg';
+    var bin = atob(b64);
+    var arr = new Uint8Array(bin.length);
+    for (var k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+    return new Blob([arr], { type: mime });
+  }
+
+  function openImageEditor(src) {
+    return loadImage(src).then(function (img) {
+      return new Promise(function (resolve) {
+        var done = false;
+        function finish(v) {
+          if (done) return;
+          done = true;
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+          resolve(v);
+        }
+
+        var rot = 0;              // 0/90/180/270
+        var ratio = 'free';       // free | 1:1 | 3:4
+        var crop = null;          // {x,y,w,h}（canvas 显示区坐标）
+        var drag = null;
+        var cw = 0, ch = 0;       // canvas 像素尺寸（旋转后）
+
+        var el = document.createElement('div');
+        el.className = 'img-editor';
+        el.innerHTML =
+          '<div class="ie-head"><span class="ie-title">编辑图片</span>' +
+            '<button type="button" class="ie-close" data-ie="close">✕</button></div>' +
+          '<div class="ie-stage" id="ie-stage"><div class="ie-canvas-wrap" id="ie-wrap">' +
+            '<canvas class="ie-canvas" id="ie-canvas"></canvas>' +
+            '<div class="ie-crop" id="ie-crop">' +
+              '<span class="ie-handle ie-h-nw" data-h="nw"></span>' +
+              '<span class="ie-handle ie-h-ne" data-h="ne"></span>' +
+              '<span class="ie-handle ie-h-sw" data-h="sw"></span>' +
+              '<span class="ie-handle ie-h-se" data-h="se"></span>' +
+            '</div>' +
+          '</div></div>' +
+          '<div class="ie-bar">' +
+            '<button type="button" class="ie-btn" data-ie="rot-l">左转 ↺</button>' +
+            '<button type="button" class="ie-btn" data-ie="rot-r">右转 ↻</button>' +
+            '<button type="button" class="ie-btn" data-ie="reset">重置</button>' +
+            '<span class="ie-sep"></span>' +
+            '<span class="ie-ratio-label">比例</span>' +
+            '<button type="button" class="ie-btn ie-ratio-btn is-on" data-ie="ratio" data-r="free">自由</button>' +
+            '<button type="button" class="ie-btn ie-ratio-btn" data-ie="ratio" data-r="1:1">1:1</button>' +
+            '<button type="button" class="ie-btn ie-ratio-btn" data-ie="ratio" data-r="3:4">3:4</button>' +
+          '</div>' +
+          '<div class="ie-foot">' +
+            '<button type="button" class="btn btn--secondary" data-ie="cancel">取消</button>' +
+            '<button type="button" class="btn btn--primary" data-ie="apply">应用</button>' +
+          '</div>';
+        document.body.appendChild(el);
+
+        var stage = el.querySelector('#ie-stage');
+        var wrap = el.querySelector('#ie-wrap');
+        var canvas = el.querySelector('#ie-canvas');
+        var cropEl = el.querySelector('#ie-crop');
+        var ctx = canvas.getContext('2d');
+
+        function rotatedSize() {
+          var w = img.naturalWidth || img.width;
+          var h = img.naturalHeight || img.height;
+          return (rot % 180 === 90) ? { w: h, h: w } : { w: w, h: h };
+        }
+
+        function paint() {
+          var rs = rotatedSize();
+          cw = rs.w; ch = rs.h;
+          canvas.width = cw;
+          canvas.height = ch;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.save();
+          ctx.translate(cw / 2, ch / 2);
+          ctx.rotate(rot * Math.PI / 180);
+          ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+          ctx.restore();
+          crop = null;
+          layout();
+        }
+
+        function canvasCss() {
+          var sw = stage.clientWidth || 300;
+          var sh = stage.clientHeight || 300;
+          var scale = Math.min(sw / cw, sh / ch);
+          return { w: Math.round(cw * scale), h: Math.round(ch * scale) };
+        }
+
+        function layout() {
+          var css = canvasCss();
+          canvas.style.width = css.w + 'px';
+          canvas.style.height = css.h + 'px';
+          wrap.style.width = css.w + 'px';
+          wrap.style.height = css.h + 'px';
+          if (!crop) crop = { x: 0, y: 0, w: css.w, h: css.h };
+          crop = clampCrop(crop);
+          applyCropEl();
+        }
+
+        function clampCrop(c) {
+          var css = canvasCss();
+          var x = Math.max(0, Math.min(c.x, css.w - 1));
+          var y = Math.max(0, Math.min(c.y, css.h - 1));
+          var w = Math.max(40, Math.min(c.w, css.w - x));
+          var h = Math.max(40, Math.min(c.h, css.h - y));
+          return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+        }
+
+        function applyCropEl() {
+          if (!crop) return;
+          cropEl.style.left = crop.x + 'px';
+          cropEl.style.top = crop.y + 'px';
+          cropEl.style.width = crop.w + 'px';
+          cropEl.style.height = crop.h + 'px';
+        }
+
+        function fitDims(ax, ay) {
+          if (ratio === 'free') return { w: ax, h: ay };
+          var target = ratio === '1:1' ? 1 : (3 / 4);
+          if (ay * target >= ax) return { w: Math.round(ay * target), h: ay };
+          return { w: ax, h: Math.round(ax / target) };
+        }
+
+        function ratioBtn(btns, val) {
+          for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('is-on', btns[i].dataset.r === val);
+        }
+
+        // ---- 裁剪框手势（pointer） ----
+        stage.addEventListener('pointerdown', function (e) {
+          if (e.button && e.button !== 0) return;
+          var h = e.target.closest('[data-h]');
+          if (h) { drag = { mode: 'resize', handle: h.dataset.h, startX: e.clientX, startY: e.clientY, base: { x: crop.x, y: crop.y, w: crop.w, h: crop.h } }; }
+          else if (cropEl.contains(e.target)) { drag = { mode: 'move', startX: e.clientX, startY: e.clientY, base: { x: crop.x, y: crop.y, w: crop.w, h: crop.h } }; }
+          else { drag = { mode: 'new', startX: e.clientX, startY: e.clientY }; }
+          if (e.cancelable) e.preventDefault();
+        });
+
+        document.addEventListener('pointermove', function (e) {
+          if (!drag) return;
+          var wrapRect = wrap.getBoundingClientRect();
+          var lx = e.clientX - wrapRect.left;
+          var ly = e.clientY - wrapRect.top;
+          if (drag.mode === 'move') {
+            var m = {
+              x: drag.base.x + (e.clientX - drag.startX),
+              y: drag.base.y + (e.clientY - drag.startY),
+              w: drag.base.w, h: drag.base.h
+            };
+            crop = clampCrop(m);
+            applyCropEl();
+          } else if (drag.mode === 'resize') {
+            var f = drag.base;
+            var fixedX = (drag.handle.indexOf('w') >= 0) ? f.x + f.w : f.x;
+            var fixedY = (drag.handle.indexOf('n') >= 0) ? f.y + f.h : f.y;
+            var ax = Math.abs(lx - fixedX), ay = Math.abs(ly - fixedY);
+            var d = fitDims(ax, ay);
+            var x = (drag.handle.indexOf('w') >= 0) ? fixedX - d.w : fixedX;
+            var y = (drag.handle.indexOf('n') >= 0) ? fixedY - d.h : fixedY;
+            crop = clampCrop({ x: x, y: y, w: d.w, h: d.h });
+            applyCropEl();
+          } else if (drag.mode === 'new') {
+            var nx = Math.min(lx, drag.startX - (drag.startX - wrapRect.left));
+            var ny = Math.min(ly, drag.startY - (drag.startY - wrapRect.top));
+            var nw = Math.abs(lx - (drag.startX - wrapRect.left));
+            var nh = Math.abs(ly - (drag.startY - wrapRect.top));
+            var d2 = fitDims(nw, nh);
+            crop = clampCrop({ x: nx, y: ny, w: d2.w, h: d2.h });
+            applyCropEl();
+          }
+        });
+
+        function endDrag() { drag = null; }
+        document.addEventListener('pointerup', endDrag);
+        document.addEventListener('pointercancel', endDrag);
+
+        // ---- 工具栏 ----
+        el.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-ie]');
+          if (!b) return;
+          var act = b.dataset.ie;
+          if (act === 'close' || act === 'cancel') { finish(null); }
+          else if (act === 'rot-l') { rot = (rot + 270) % 360; paint(); }
+          else if (act === 'rot-r') { rot = (rot + 90) % 360; paint(); }
+          else if (act === 'reset') { rot = 0; ratio = 'free'; ratioBtn(el.querySelectorAll('.ie-ratio-btn'), 'free'); paint(); }
+          else if (act === 'ratio') { ratio = b.dataset.r; ratioBtn(el.querySelectorAll('.ie-ratio-btn'), ratio); crop = clampCrop(crop); applyCropEl(); }
+          else if (act === 'apply') { doApply(); }
+        });
+
+        function doApply() {
+          if (!crop) { finish(null); return; }
+          var css = canvasCss();
+          var scaleX = cw / css.w, scaleY = ch / css.h;
+          var sx = Math.round(crop.x * scaleX), sy = Math.round(crop.y * scaleY);
+          var sw = Math.max(1, Math.round(crop.w * scaleX)), sh = Math.max(1, Math.round(crop.h * scaleY));
+          var out = document.createElement('canvas');
+          out.width = sw; out.height = sh;
+          var octx = out.getContext('2d');
+          octx.fillStyle = '#FFFFFF';
+          octx.fillRect(0, 0, sw, sh);
+          octx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+          var dataUrl = out.toDataURL('image/jpeg', 0.92);
+          if (EATG.ui) EATG.ui.toast('正在压缩…');
+          compressImage(dataUrlToBlob(dataUrl), { maxEdge: 1920, quality: 0.85 }).then(function (finalUrl) {
+            finish(finalUrl);
+          }).catch(function (err) {
+            console.error('[EATG] 图片编辑应用失败', err);
+            if (EATG.ui) EATG.ui.toast('处理失败，已取消', 'error');
+            finish(null);
+          });
+        }
+
+        paint();
+      });
+    });
+  }
+
+  U.openImageEditor = openImageEditor;
+
   // ---- 主题切换（P-03 深色模式） ----
   function applyTheme(val) {
     var t = val || 'auto';

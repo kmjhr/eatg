@@ -399,8 +399,9 @@
 
   function renderImages() {
     var html = state.images.map(function (src, i) {
-      return '<div class="grid9-cell"><img src="' + src + '" alt="">' +
-        '<button type="button" class="cell-del" data-del="' + i + '" aria-label="移除图片">×</button></div>';
+      return '<div class="grid9-cell"><img src="' + src + '" alt="" data-edit="' + i + '">' +
+        '<button type="button" class="cell-del" data-del="' + i + '" aria-label="移除图片">×</button>' +
+        '<button type="button" class="cell-edit" data-edit="' + i + '" aria-label="编辑图片（旋转/裁剪）">✎</button></div>';
     }).join('');
     if (state.images.length < MAX_IMAGES) {
       html += '<button type="button" class="grid9-add" id="g-img-add" aria-label="添加图片">＋<span>添加图片</span></button>';
@@ -498,10 +499,12 @@
   // ---- 事件绑定 ----
 
   function bindEvents() {
-    // 图片九宫格
+    // 图片九宫格：✎/点图 = 编辑；× = 删除；＋ = 添加
     on(dom.images, 'click', function (e) {
       var del = e.target.closest('[data-del]');
       if (del) { state.images.splice(Number(del.dataset.del), 1); renderImages(); return; }
+      var edit = e.target.closest('[data-edit]');
+      if (edit) { openEditImage(Number(edit.dataset.edit)); return; }
       if (e.target.closest('#g-img-add')) openAddImageSheet();
     });
     on(dom.camera, 'change', function () { handleFiles(dom.camera.files, dom.camera); });
@@ -567,6 +570,19 @@
       ref.close();
       if (b.dataset.src === 'camera') dom.camera.click();
       else dom.album.click();
+    });
+  }
+
+  /** 打开图片编辑器（utils.openImageEditor：旋转/裁剪），应用后替换该格图片 */
+  function openEditImage(i) {
+    var src = state.images[i];
+    if (!src) return;
+    if (!U.openImageEditor) { UI.toast('图片编辑暂不可用', 'error'); return; }
+    U.openImageEditor(src).then(function (out) {
+      if (state.destroyed || out == null) return;
+      state.images[i] = out;
+      renderImages();
+      UI.toast('图片已更新', 'success');
     });
   }
 

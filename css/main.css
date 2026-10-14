@@ -1714,3 +1714,17 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .ie-ratio-label{font-size:12px;color:var(--ink-3,#9AA3B5)}
 .ie-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid var(--line,#E6E9F0)}
 .ie-foot .btn{height:40px;min-width:92px}
+
+/* ===== 监控源抓取（RSS 真抓取）===== */
+.src-fetch-all{margin-top:10px;display:block}
+.src-fetch-all .btn{height:34px;padding:0 14px}
+.src-row-status-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px}
+.src-row-status{font-size:12px}
+.src-row-status.is-ok{color:var(--success,#34C38A)}
+.src-row-status.is-bad{color:var(--danger,#E8556B)}
+.src-row-status.is-running{color:var(--info,#4AA8E8)}
+.src-row-status b{font-weight:700}
+
+/* RSS 资讯标题链接 */
+.news-card-title-link{color:var(--ink,#1A1A2E);text-decoration:none;display:inline-flex;align-items:flex-start;gap:6px}
+.news-card-title-link:active{opacity:.6}

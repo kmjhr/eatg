@@ -111,11 +111,15 @@
     var img = n.image ? '<img class="news-card-img" src="' + n.image + '" alt="">' : '<div class="news-card-img news-card-img--ph">无图</div>';
     var chars = charNames(n.character_ids);
     var unread = n.is_read ? '' : '<span class="news-unread"></span>';
+    // RSS 抓取的资讯带原链接：点标题开原文（不跳详情编辑）
+    var titleHTML = n.link
+      ? '<a class="news-card-title-link" data-open-link href="' + esc(n.link) + '" target="_blank" rel="noopener noreferrer">' + unread + esc(n.title) + '</a>'
+      : unread + esc(n.title);
     return '<div class="news-card' + (n.status === 'ignored' ? ' is-ignored' : '') + '" data-nid="' + n.id + '">' +
       '<div class="news-card-main">' +
         '<div class="news-card-head">' + img +
           '<div class="news-card-info">' +
-            '<div class="news-card-title">' + unread + esc(n.title) + '</div>' +
+            '<div class="news-card-title">' + titleHTML + '</div>' +
             '<div class="news-card-meta">' +
               (n.ip ? '<span class="tag tag--ip">' + esc(n.ip) + '</span>' : '') +
               (chars ? '<span class="tag">' + esc(chars) + '</span>' : '') +
@@ -244,7 +248,7 @@
       if (e.cancelable) e.preventDefault();
     }
   }
-  function onPointerUp() {
+  function onPointerUp(e) {
     document.removeEventListener('pointermove', onPointerMove);
     document.removeEventListener('pointerup', onPointerUp);
     document.removeEventListener('pointercancel', onPointerUp);
@@ -261,9 +265,11 @@
         if (swipe.opened === card) swipe.opened = null;
       }
     } else if (!swipe.moved) {
-      // 点击卡片 → 详情
+      // 点击卡片 → 详情（点 RSS 原文链接不跳转，交给浏览器新开）
       var nid = Number(card.dataset.nid);
-      go('#/news/edit?id=' + nid);
+      var t = e && e.target;
+      var linkA = t && t.closest ? t.closest('a[data-open-link]') : null;
+      if (!linkA) go('#/news/edit?id=' + nid);
     }
     resetSwipe();
   }
@@ -355,6 +361,28 @@
       '<button type="button" class="btn btn--primary btn--sm" id="nf-enable">开启通知</button></div>';
   }
 
+  function renderView() {
+    var c = dom.container;
+    c.innerHTML = notifyBannerHTML() + pageHTML();
+    var en = document.getElementById('nf-enable');
+    if (en) on(en, 'click', requestNotifyPermission);
+    bind();
+  }
+
+  /** 打开资讯页时按频率自动抓取启用的 RSS 源，有新条目则刷新列表 */
+  function autoFetch() {
+    if (!EATG.rss || !EATG.rss.autoFetchEnabled) return;
+    EATG.rss.autoFetchEnabled().then(function (n) {
+      if (state.destroyed || !n) return;
+      return load().then(function () {
+        if (state.destroyed) return;
+        renderView();
+        checkReminders();
+        UI.toast('已自动抓取 RSS 资讯', 'success');
+      });
+    }).catch(function () { /* 静默：抓取失败不打断浏览 */ });
+  }
+
   function mount(container, ctx) {
     resetState();
     dom = { container: container };
@@ -374,11 +402,9 @@
     if (add) on(add, 'click', function () { go('#/news/edit'); });
     return load().then(function () {
       if (state.destroyed) return;
-      container.innerHTML = notifyBannerHTML() + pageHTML();
-      var en = document.getElementById('nf-enable');
-      if (en) on(en, 'click', requestNotifyPermission);
-      bind();
+      renderView();
       checkReminders();
+      autoFetch();
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 资讯首页加载失败', err);

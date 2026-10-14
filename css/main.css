@@ -1444,6 +1444,16 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .switch--sm .switch-track::after{width:14px;height:14px;top:2px;left:2px}
 .switch--sm input:checked+.switch-track::after{transform:translateX(16px)}
 .news-list{padding:0 var(--pad-page) var(--pad-page)}
+/* 资讯：收藏/多选/删除/底部清空条 */
+.news-fav{position:absolute;top:8px;left:8px;z-index:3;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:rgba(255,255,255,.92);color:#E8445C;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.12);pointer-events:none}
+.news-check{position:absolute;top:8px;right:8px;z-index:3;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;border:2px solid var(--primary,#3D6DF5);background:var(--card,#fff);color:#fff;font-size:13px;font-weight:700;pointer-events:none}
+.news-card.is-selected{border-color:var(--primary,#3D6DF5);box-shadow:0 0 0 2px var(--primary-soft,rgba(61,109,245,.2))}
+.news-card.is-selected .news-check{background:var(--primary,#3D6DF5)}
+.news-card.is-multi .news-card-actions{opacity:.4}
+.swipe-btn--fav{background:var(--accent,#F5C542);color:#5A4400}
+.news-multi-bar{position:fixed;left:0;right:0;bottom:calc(var(--nav-h,50px) + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0);box-shadow:0 -2px 10px rgba(0,0,0,.08)}
+.news-multi-count{flex:1;font-size:13px;color:var(--ink-2,#5B6478)}
+.icon-btn.is-on{color:var(--primary,#3D6DF5);font-weight:700}
 .news-card{position:relative;overflow:hidden;background:var(--card);border-radius:10px;border:1px solid var(--line);margin-bottom:10px}
 .news-card.is-ignored{opacity:.55}
 .news-card-main{position:relative;z-index:2;background:var(--card);transition:transform .2s}

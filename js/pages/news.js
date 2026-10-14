@@ -2,11 +2,12 @@
    一咕（EATG）· 资讯首页（js/pages/news.js）
    实现：《页面线框与UI规范》P14 + 《业务规则》§10
    路由：#/news
-   内容：1 顶部：标题 + 筛选（IP/角色/类型/只看未读） + 监控源 + 手动添加 + 愿望清单入口
-        2 卡片流：图/标题/IP角色/开订/出荷/参考价/渠道；未读圆点
-        3 三按钮：想买(wish) / 已订(ordered) / 忽略(ignored)
-        4 左滑快速忽略
-        5 提醒：开订/出荷前 Notification + 应用内检查，免打扰时段不弹
+   内容：1 顶部：标题 + 筛选（IP/角色/类型/只看未读） + 监控源 + 手动添加 + 多选
+        2 卡片流：图/标题/IP角色/开订/出荷/参考价/渠道；未读圆点；收藏 ♥
+        3 三按钮：想买(wish) / 已订(ordered) / 删除(del)（原「忽略」改为删除）
+        4 手势：左滑→收藏（露按钮）；右滑→直接删除（收藏的受保护不删）
+        5 多选模式：点卡片勾选，底部一键清空选中
+        6 提醒：开订/出荷前 Notification + 应用内检查，免打扰时段不弹
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -22,7 +23,7 @@
   var dom = {};
   var offs = [];
   var swipe = { card: null, row: null, startX: 0, startY: 0, dx: 0, dragging: false, moved: false, opened: null };
-  var SWIPE_OPEN = 72;
+  var SWIPE_OPEN = 76;
   var TAP_TOL = 6;
 
   function on(el, ev, fn, opt) { if (!el) return; el.addEventListener(ev, fn, opt); offs.push([el, ev, fn, opt]); }
@@ -37,7 +38,9 @@
       news: [],
       charsById: {},
       filters: { ip: '', char: '', type: '', unread: false },
-      enums: { ip: [], goods_type: [] }
+      enums: { ip: [], goods_type: [] },
+      multi: false,       // 多选模式
+      sel: {}             // 选中的 nid → true
     };
   }
 
@@ -115,7 +118,12 @@
     var titleHTML = n.link
       ? '<a class="news-card-title-link" data-open-link href="' + esc(n.link) + '" target="_blank" rel="noopener noreferrer">' + unread + esc(n.title) + '</a>'
       : unread + esc(n.title);
-    return '<div class="news-card' + (n.status === 'ignored' ? ' is-ignored' : '') + '" data-nid="' + n.id + '">' +
+    var fav = n.is_fav ? '<span class="news-fav">♥</span>' : '';
+    var cls = 'news-card' + (n.status === 'ignored' ? ' is-ignored' : '') +
+      (state.multi ? ' is-multi' : '') +
+      (state.multi && state.sel[n.id] ? ' is-selected' : '');
+    var check = state.multi ? '<span class="news-check">' + (state.sel[n.id] ? '✓' : '') + '</span>' : '';
+    return '<div class="' + cls + '" data-nid="' + n.id + '">' +
       '<div class="news-card-main">' +
         '<div class="news-card-head">' + img +
           '<div class="news-card-info">' +
@@ -138,10 +146,13 @@
         '<div class="news-card-actions">' +
           '<button type="button" class="btn btn--secondary btn--sm" data-act="wish">想买</button>' +
           '<button type="button" class="btn btn--primary btn--sm" data-act="order">已订</button>' +
-          '<button type="button" class="btn btn--danger btn--sm" data-act="ignore">忽略</button>' +
+          '<button type="button" class="btn btn--danger btn--sm" data-act="del">删除</button>' +
         '</div>' +
       '</div>' +
-      '<div class="swipe-actions"><button type="button" class="swipe-btn swipe-btn--out" data-act="ignore">忽略</button></div>' +
+      '<div class="swipe-actions">' +
+        '<button type="button" class="swipe-btn swipe-btn--fav" data-act="fav">' + (n.is_fav ? '取消收藏' : '收藏') + '</button>' +
+      '</div>' +
+      check + fav +
     '</div>';
   }
 
@@ -151,10 +162,22 @@
     return '<div class="news-list">' + list.map(cardHTML).join('') + '</div>';
   }
 
+  function multiBarHTML() {
+    if (!state.multi) return '';
+    var count = 0;
+    Object.keys(state.sel).forEach(function (k) { if (state.sel[k]) count++; });
+    return '<div class="news-multi-bar">' +
+      '<span class="news-multi-count">已选 ' + count + ' 条</span>' +
+      '<button type="button" class="btn btn--danger btn--sm" data-act="clear-sel"' + (count ? '' : ' disabled') + '>清空</button>' +
+      '<button type="button" class="btn btn--secondary btn--sm" data-act="multi-exit">取消</button>' +
+    '</div>';
+  }
+
   function pageHTML() {
     return '<div class="page-scroll" id="news-page">' +
       filterHTML() +
       listHTML() +
+      multiBarHTML() +
     '</div>';
   }
 
@@ -163,8 +186,32 @@
   function rerender() {
     var page = document.getElementById('news-page');
     if (!page) return;
-    page.innerHTML = filterHTML() + listHTML();
+    page.innerHTML = filterHTML() + listHTML() + multiBarHTML();
     bindFilter();
+    updateMultiNav();
+  }
+
+  function updateMultiNav() {
+    var btn = document.getElementById('nf-multi');
+    if (btn) {
+      btn.textContent = state.multi ? '完成' : '多选';
+      btn.classList.toggle('is-on', !!state.multi);
+    }
+    if (state.multi) {
+      var wl = document.getElementById('nf-wishlist');
+      var src = document.getElementById('nf-sources');
+      var add = document.getElementById('nf-add');
+      if (wl) wl.hidden = true;
+      if (src) src.hidden = true;
+      if (add) add.hidden = true;
+    } else {
+      var wl2 = document.getElementById('nf-wishlist');
+      var src2 = document.getElementById('nf-sources');
+      var add2 = document.getElementById('nf-add');
+      if (wl2) wl2.hidden = false;
+      if (src2) src2.hidden = false;
+      if (add2) add2.hidden = false;
+    }
   }
 
   function bindFilter() {
@@ -180,7 +227,7 @@
     if (un) on(un, 'change', function () { state.filters.unread = un.checked; rerender(); });
   }
 
-  // ---- 三操作 ----
+  // ---- 操作 ----
   function setStatus(nid, status) {
     return S.get('news', nid).then(function (n) {
       if (!n) return;
@@ -190,7 +237,7 @@
     }).then(function () {
       var idx = state.news.findIndex(function (x) { return x.id === nid; });
       if (idx >= 0) { state.news[idx].status = status; state.news[idx].is_read = true; }
-      UI.toast(status === 'wish' ? '已加入愿望清单' : status === 'ordered' ? '已标记已订' : '已忽略', 'success');
+      UI.toast(status === 'wish' ? '已加入愿望清单' : '已标记已订', 'success');
       rerender();
     });
   }
@@ -214,12 +261,75 @@
   }
 
   function doWish(nid) { setStatus(nid, 'wish'); }
-  function doIgnore(nid) { setStatus(nid, 'ignored'); }
 
-  // ---- 左滑 ----
+  /** 删除一条资讯；收藏（is_fav）的受保护，先取消收藏才能删 */
+  function doDelete(nid) {
+    return S.get('news', nid).then(function (n) {
+      if (!n) return;
+      if (n.is_fav) { UI.toast('已收藏的资讯不能删除，先左滑取消收藏', 'error'); return false; }
+      return S.del('news', nid).then(function () {
+        state.news = state.news.filter(function (x) { return x.id !== nid; });
+        delete state.sel[nid];
+        UI.toast('已删除', 'success');
+        rerender();
+        return true;
+      });
+    });
+  }
+
+  /** 收藏 / 取消收藏 */
+  function doFav(nid) {
+    return S.get('news', nid).then(function (n) {
+      if (!n) return;
+      n.is_fav = !n.is_fav;
+      return S.put('news', n);
+    }).then(function () {
+      var idx = state.news.findIndex(function (x) { return x.id === nid; });
+      if (idx >= 0) { state.news[idx].is_fav = !state.news[idx].is_fav; }
+      UI.toast(state.news[idx] && state.news[idx].is_fav ? '已收藏（不会被删除）' : '已取消收藏', 'success');
+      rerender();
+    });
+  }
+
+  // ---- 多选 ----
+  function toggleMulti() {
+    state.multi = !state.multi;
+    if (!state.multi) state.sel = {};
+    rerender();
+  }
+  function toggleSel(nid) {
+    if (state.sel[nid]) delete state.sel[nid];
+    else state.sel[nid] = true;
+    rerender();
+  }
+  function clearSelected() {
+    var ids = Object.keys(state.sel).filter(function (k) { return state.sel[k]; }).map(Number);
+    if (!ids.length) return;
+    var favBlocked = [], ok = 0;
+    var chain = Promise.resolve();
+    ids.forEach(function (id) {
+      chain = chain.then(function () {
+        return S.get('news', id).then(function (n) {
+          if (!n) return;
+          if (n.is_fav) { favBlocked.push(n.title); return; }
+          return S.del('news', id).then(function () { ok++; });
+        });
+      });
+    });
+    chain.then(function () {
+      state.news = state.news.filter(function (x) { return !ids.some(function (id) { return Number(x.id) === id && !x.is_fav; }); });
+      state.sel = {};
+      var msg = '已删除 ' + ok + ' 条' + (favBlocked.length ? '；' + favBlocked.length + ' 条收藏已保留' : '');
+      UI.toast(msg, 'success');
+      rerender();
+    });
+  }
+
+  // ---- 滑动：左滑收藏（露按钮）/ 右滑删除 ----
   function onPointerDown(e) {
+    if (state.multi) return;
     var card = e.target.closest('.news-card');
-    if (!card || e.target.closest('.swipe-btn') || e.target.closest('.news-card-actions')) return;
+    if (!card || e.target.closest('.swipe-btn') || e.target.closest('.news-card-actions') || e.target.closest('a[data-open-link]')) return;
     swipe.card = card;
     swipe.row = card.querySelector('.news-card-main');
     swipe.startX = e.clientX;
@@ -242,7 +352,8 @@
       else { resetSwipe(); return; }
     }
     if (swipe.dragging) {
-      var off = Math.max(-SWIPE_OPEN, Math.min(0, swipe.base + dx));
+      // 双向：左滑到 -SWIPE_OPEN（露收藏），右滑最多 +SWIPE_OPEN
+      var off = Math.max(-SWIPE_OPEN, Math.min(SWIPE_OPEN, swipe.base + dx));
       swipe.dx = off;
       swipe.row.style.transform = 'translateX(' + off + 'px)';
       if (e.cancelable) e.preventDefault();
@@ -256,7 +367,15 @@
     var card = swipe.card, row = swipe.row;
     if (swipe.dragging) {
       row.style.transition = 'transform .2s';
-      if (swipe.dx < -SWIPE_OPEN / 2) {
+      // 右滑超过阈值 → 直接删除（收藏的受保护，不删）
+      if (swipe.dx > SWIPE_OPEN / 2) {
+        row.style.transform = 'translateX(110%)';
+        row.style.opacity = '0';
+        var nid = Number(card.dataset.nid);
+        setTimeout(function () { doDelete(nid); }, 160);
+        if (swipe.opened && swipe.opened !== card) closeCard(swipe.opened);
+        swipe.opened = null;
+      } else if (swipe.dx < -SWIPE_OPEN / 2) {
         row.style.transform = 'translateX(-' + SWIPE_OPEN + 'px)';
         if (swipe.opened && swipe.opened !== card) closeCard(swipe.opened);
         swipe.opened = card;
@@ -265,11 +384,12 @@
         if (swipe.opened === card) swipe.opened = null;
       }
     } else if (!swipe.moved) {
-      // 点击卡片 → 详情（点 RSS 原文链接不跳转，交给浏览器新开）
-      var nid = Number(card.dataset.nid);
+      // 点击卡片：多选模式勾选；普通模式进详情（点 RSS 原文链接不跳转）
+      var nid2 = Number(card.dataset.nid);
       var t = e && e.target;
       var linkA = t && t.closest ? t.closest('a[data-open-link]') : null;
-      if (!linkA) go('#/news/edit?id=' + nid);
+      if (state.multi) toggleSel(nid2);
+      else if (!linkA) go('#/news/edit?id=' + nid2);
     }
     resetSwipe();
   }
@@ -286,14 +406,21 @@
     bindFilter();
     on(page, 'click', function (e) {
       var btn = e.target.closest('[data-act]');
-      if (!btn) return;
-      var card = btn.closest('.news-card');
-      if (!card) return;
-      var nid = Number(card.dataset.nid);
-      var act = btn.dataset.act;
-      if (act === 'wish') doWish(nid);
-      else if (act === 'order') doOrder(nid);
-      else if (act === 'ignore') doIgnore(nid);
+      if (btn) {
+        var card = btn.closest('.news-card');
+        var nid = card ? Number(card.dataset.nid) : null;
+        var act = btn.dataset.act;
+        if (act === 'wish' && nid != null) doWish(nid);
+        else if (act === 'order' && nid != null) doOrder(nid);
+        else if (act === 'del' && nid != null) doDelete(nid);
+        else if (act === 'fav' && nid != null) doFav(nid);
+        else if (act === 'clear-sel') clearSelected();
+        else if (act === 'multi-exit') toggleMulti();
+        return;
+      }
+      // 多选模式点卡片本身也勾选
+      var c = e.target.closest('.news-card');
+      if (c && state.multi) toggleSel(Number(c.dataset.nid));
     });
     on(page, 'pointerdown', onPointerDown);
   }
@@ -367,6 +494,7 @@
     var en = document.getElementById('nf-enable');
     if (en) on(en, 'click', requestNotifyPermission);
     bind();
+    updateMultiNav();
   }
 
   /** 打开资讯页时按频率自动抓取启用的 RSS 源，有新条目则刷新列表 */
@@ -393,13 +521,16 @@
     ctx.navActions.innerHTML =
       '<button id="nf-wishlist" type="button" class="icon-btn" title="愿望清单">♡</button>' +
       '<button id="nf-sources" type="button" class="icon-btn" title="监控源">⚙</button>' +
-      '<button id="nf-add" type="button" class="icon-btn icon-btn--accent" title="手动添加">＋</button>';
+      '<button id="nf-add" type="button" class="icon-btn icon-btn--accent" title="手动添加">＋</button>' +
+      '<button id="nf-multi" type="button" class="icon-btn" title="多选">多选</button>';
     var wl = document.getElementById('nf-wishlist');
     var src = document.getElementById('nf-sources');
     var add = document.getElementById('nf-add');
+    var multi = document.getElementById('nf-multi');
     if (wl) on(wl, 'click', function () { go('#/wishlist'); });
     if (src) on(src, 'click', function () { go('#/sources'); });
     if (add) on(add, 'click', function () { go('#/news/edit'); });
+    if (multi) on(multi, 'click', toggleMulti);
     return load().then(function () {
       if (state.destroyed) return;
       renderView();

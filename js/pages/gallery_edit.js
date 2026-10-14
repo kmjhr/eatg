@@ -87,7 +87,7 @@
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
           '<div class="ge-img-row">' +
             (it.image ? '<img class="ge-img" src="' + esc(it.image) + '">' : '<div class="ge-img ge-img--ph">无图</div>') +
-            '<input type="file" id="ge-img-input" accept="image/*" hidden>' +
+            '<input type="file" id="ge-img-input" class="file-hidden" accept="image/*">' +
             '<button type="button" class="btn btn--secondary" id="ge-img-btn">选择图片</button>' +
             (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-clear">清除</button>' : '') +
           '</div></div>' +

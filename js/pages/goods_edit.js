@@ -6,7 +6,7 @@
         2 购入记录表单（日期/数量/本体单价(可空)/币种/邮费分摊/渠道/状态/价格状态/备注）
         3 定尾预售扩展区（定金/尾款/补款截止/到期提醒开关 + 一键转全款预售）
         4 快捷词面板（localStorage: eatg_quick_words，各字段旁一键填入）
-        5 连续录入开关（开启后保存不清空表单）
+        5 连续录入开关（开启后保存自动清空表单，方便连续录入下一项）
         6 from=news|order 预填
         7 保存：校验必填 → 更新 goods.agg → 跳转详情（无详情页则列表）
         8 edit 模式复用同一页面
@@ -336,8 +336,8 @@
         '<button type="button" class="btn btn--primary" data-act="save">保存</button>' +
       '</div>' +
 
-      '<input type="file" id="f-camera" accept="image/*" capture="environment" hidden>' +
-      '<input type="file" id="f-album" accept="image/*" multiple hidden>' +
+      '<input type="file" id="f-camera" class="file-hidden" accept="image/*" capture="environment">' +
+      '<input type="file" id="f-album" class="file-hidden" accept="image/*" multiple>' +
 
     '</section>';
   }
@@ -967,12 +967,30 @@
     });
   }
 
+  /** 连续录入：保存成功后清空表单，留在录入页继续填下一项（新增模式） */
+  function resetForm() {
+    state.goodsId = null;
+    state.purchaseId = null;
+    state.orderId = null;
+    state.priceManual = false;
+    state.characterIds = [];
+    state.images = [];
+    state.tags = [];
+    state.goods = {};
+    state.purchase = {};
+    applyQueryPrefill(new URLSearchParams('')); // 空参数 → 默认（购入日期=今天、数量 1 等）
+    clearOffs();
+    dom.container.innerHTML = sectionHTML();
+    cacheDom();
+    bindEvents();
+    applyState();
+    if (dom.name) { try { dom.name.focus(); } catch (e) {} }
+  }
+
   function afterSave(gid) {
     if (state.continuous && state.mode === 'add') {
-      UI.toast('已保存，可继续录入', 'success');
-      // 不清空表单（L-03）；下次保存继续新增
-      state.goodsId = null;
-      state.purchaseId = null;
+      UI.toast('已保存，表单已清空，可继续录入', 'success');
+      resetForm();
       return;
     }
     var hasDetail = !!(EATG.pages && EATG.pages['goods/detail']);

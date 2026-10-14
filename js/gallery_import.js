@@ -116,7 +116,7 @@
   GI.open = function (ctx) {
     var body = '<div class="form-section">' +
       '<div class="field"><div class="field-head"><label class="field-label">方式一 · 导入本地清单文件（.json）</label></div>' +
-        '<input type="file" id="gi-file" accept=".json,application/json" hidden>' +
+        '<input type="file" id="gi-file" class="file-hidden" accept=".json,application/json">' +
         '<button type="button" class="btn btn--secondary" id="gi-file-btn">选择清单文件…</button>' +
       '</div>' +
       '<div class="field"><div class="field-head"><label class="field-label">方式二 · 在线检查更新</label></div>' +

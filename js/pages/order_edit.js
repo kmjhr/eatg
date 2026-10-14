@@ -304,7 +304,7 @@
   function pageHTML() {
     return '<section class="page page--order">' +
       infoHTML() + amountHTML() + splitHTML() + itemsHTML() + balanceHTML() + actionsHTML() +
-      '<input type="file" id="o-file" accept="image/*" hidden>' +
+      '<input type="file" id="o-file" class="file-hidden" accept="image/*">' +
       '</section>';
   }
 

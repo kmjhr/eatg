@@ -825,6 +825,8 @@ html[data-theme='dark'] .prefill-note { background: rgba(255, 221, 136, 0.16); c
   line-height: 1;
   z-index: 2;
 }
+/* 视觉隐藏文件选择框：不能用 display:none（iOS Safari 下 .click() 无效） */
+.file-hidden{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1}
 .grid9-add {
   display: flex;
   flex-direction: column;

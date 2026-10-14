@@ -1145,8 +1145,13 @@
       return;
     }
     var hasDetail = !!(EATG.pages && EATG.pages['goods/detail']);
-    EATG.app && EATG.app.navigate ? EATG.app.navigate(hasDetail ? ('#/goods/detail?id=' + gid) : '#/library')
-      : (global.location.hash = hasDetail ? ('#/goods/detail?id=' + gid) : '#/library');
+    var url = hasDetail ? ('#/goods/detail?id=' + gid) : '#/library';
+    // 用 replace 跳转：历史里不留表单页——详情页返回直接回到进入编辑前的页面（谷子库等），不会回到新建/编辑表单
+    try { global.location.replace(url); }
+    catch (e) {
+      if (EATG.app && EATG.app.navigate) EATG.app.navigate(url);
+      else global.location.hash = url;
+    }
   }
 
   function leave() {

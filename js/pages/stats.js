@@ -64,18 +64,32 @@
     return total;
   }
 
-  /** 按 key 聚合 {label, value, count, unknown}
-   *  mode='filled'（分开统计）：value 只计已填写（明确价格）
-   *  mode='all'（总统计）：value 计已填写+估算（unknown 金额无法计，按 0）
-   *  count 始终含全部件数（估算/未知件也计入占比）；unknown 记录未知价件数 */
-  function groupCostBy(model, keyFn, labelFn, mode) {
+  /** 按 key 聚合 {label, value, count, unknown, items}
+   *  mode='filled'（分开统计）：金额与件数都只计已填写（估算/未知件「当作不存在」）
+   *  mode='all'（总统计）：金额计已填写+估算；件数含全部（估算/未知件也计入）；unknown 记录未知价件数
+   *  items：该组各条记录的构成明细（谷子名×数量·金额·状态），供点击展开自查 */
+  function groupCostBy(model, keyFn, labelFn, mode, goodsById) {
     var map = {}, order = [];
     (model.purchases || []).forEach(function (p) {
       var k = keyFn(p) || '未分类';
-      if (!map[k]) { map[k] = { label: labelFn(p, k) || k, value: 0, count: 0, unknown: 0 }; order.push(k); }
-      if (p.price_status === 'unknown') map[k].unknown += num(p.quantity);
-      if (mode !== 'filled' || p.price_status === 'filled') map[k].value += A.purchaseCost(p);
-      map[k].count += num(p.quantity);
+      if (!map[k]) { map[k] = { label: labelFn(p, k) || k, value: 0, count: 0, unknown: 0, items: [] }; order.push(k); }
+      var q = num(p.quantity);
+      var g = goodsById && goodsById[p.goods_id];
+      var name = g && g.name ? g.name : ('谷子#' + p.goods_id);
+      var cost = A.purchaseCost(p);
+      if (p.price_status === 'filled') {
+        map[k].value += cost; map[k].count += q;
+        map[k].items.push({ name: name, qty: q, cost: cost, status: 'filled' });
+      } else if (p.price_status === 'estimated') {
+        if (mode === 'all') {
+          map[k].value += cost; map[k].count += q;
+          map[k].items.push({ name: name, qty: q, cost: cost, status: 'estimated' });
+        }
+        // filled 模式：估算件当作不存在
+      } else if (mode === 'all') {
+        map[k].count += q; map[k].unknown += q;
+        map[k].items.push({ name: name, qty: q, cost: 0, status: 'unknown' });
+      }
     });
     return order.map(function (k) { return map[k]; });
   }
@@ -408,7 +422,7 @@
     var ipData = groupCostBy(state.model,
       function (p) { var g = goodsById[p.goods_id]; return g ? g.ip : ''; },
       function (p, k) { return k; },
-      mode);
+      mode, goodsById);
     var ipSegs = donutSegments(ipData);
     var ipCanvas = document.getElementById('chart-ip');
     var ipRef = drawDonut(ipCanvas, ipSegs, String(ipData.reduce(function (a, d) { return a + d.count; }, 0)), '件');
@@ -419,7 +433,7 @@
     var typeData = groupCostBy(state.model,
       function (p) { var g = goodsById[p.goods_id]; return g ? g.goods_type : ''; },
       function (p, k) { return k; },
-      mode);
+      mode, goodsById);
     var typeSegs = donutSegments(typeData);
     var typeCanvas = document.getElementById('chart-type');
     var typeRef = drawDonut(typeCanvas, typeSegs, String(typeData.reduce(function (a, d) { return a + d.count; }, 0)), '件');
@@ -456,11 +470,21 @@
       '</div>';
       return;
     }
-    el.innerHTML = '<div class="chart-detail-row">' +
+    var head = '<div class="chart-detail-row">' +
       '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
       '<span class="chart-detail-value">' + val + '</span>' +
       (meta ? '<span class="chart-detail-meta">' + meta + '</span>' : '') +
     '</div>';
+    var items = data.items && data.items.length
+      ? '<div class="chart-detail-list">' + data.items.map(function (it) {
+          var st = it.status === 'estimated' ? '（估算）' : (it.status === 'unknown' ? '（未知价）' : '');
+          return '<div class="chart-detail-item">' +
+            '<span>' + esc(it.name) + ' ×' + it.qty + st + '</span>' +
+            '<span>' + money(it.cost) + '</span>' +
+          '</div>';
+        }).join('') + '</div>'
+      : '';
+    el.innerHTML = head + items;
   }
 
   // ---- 事件绑定 ----

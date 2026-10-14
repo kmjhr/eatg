@@ -120,6 +120,7 @@
       : unread + esc(n.title);
     var fav = n.is_fav ? '<span class="news-fav">♥</span>' : '';
     var cls = 'news-card' + (n.status === 'ignored' ? ' is-ignored' : '') +
+      (n.is_read ? ' is-read' : '') +
       (state.multi ? ' is-multi' : '') +
       (state.multi && state.sel[n.id] ? ' is-selected' : '');
     var check = state.multi ? '<span class="news-check">' + (state.sel[n.id] ? '✓' : '') + '</span>' : '';
@@ -159,15 +160,19 @@
   function listHTML() {
     var list = filteredNews();
     if (!list.length) return '<p class="empty-line">没有匹配的资讯</p>';
-    return '<div class="news-list">' + list.map(cardHTML).join('') + '</div>';
+    var tip = state.multi ? '' : '<div class="news-swipe-tip">左滑收藏 ♥ ｜ 右滑删除 ｜ 点开即已读</div>';
+    return tip + '<div class="news-list">' + list.map(cardHTML).join('') + '</div>';
   }
 
   function multiBarHTML() {
     if (!state.multi) return '';
     var count = 0;
     Object.keys(state.sel).forEach(function (k) { if (state.sel[k]) count++; });
+    var list = filteredNews();
+    var allSel = list.length > 0 && list.every(function (n) { return state.sel[n.id]; });
     return '<div class="news-multi-bar">' +
       '<span class="news-multi-count">已选 ' + count + ' 条</span>' +
+      '<button type="button" class="btn btn--secondary btn--sm" data-act="sel-all">' + (allSel ? '取消全选' : '全选') + '</button>' +
       '<button type="button" class="btn btn--danger btn--sm" data-act="clear-sel"' + (count ? '' : ' disabled') + '>清空</button>' +
       '<button type="button" class="btn btn--secondary btn--sm" data-act="multi-exit">取消</button>' +
     '</div>';
@@ -291,6 +296,37 @@
     });
   }
 
+  /** 点开即已读：打开原文链接或详情时标记 is_read，卡片变灰 */
+  function markRead(nid) {
+    var n = null;
+    for (var i = 0; i < state.news.length; i++) { if (state.news[i].id === nid) { n = state.news[i]; break; } }
+    if (!n || n.is_read) return;
+    S.get('news', nid).then(function (db) {
+      if (!db) return;
+      db.is_read = true;
+      return S.put('news', db);
+    }).then(function () {
+      n.is_read = true;
+      var card = document.querySelector('.news-card[data-nid="' + nid + '"]');
+      if (card) {
+        card.classList.add('is-read');
+        var dot = card.querySelector('.news-unread');
+        if (dot) dot.remove();
+      }
+    });
+  }
+
+  /** 多选全选 / 取消全选（当前筛选结果内） */
+  function toggleSelectAll() {
+    var list = filteredNews();
+    var allSel = list.length > 0 && list.every(function (n) { return state.sel[n.id]; });
+    list.forEach(function (n) {
+      if (allSel) delete state.sel[n.id];
+      else state.sel[n.id] = true;
+    });
+    rerender();
+  }
+
   // ---- 多选 ----
   function toggleMulti() {
     state.multi = !state.multi;
@@ -383,13 +419,6 @@
         row.style.transform = 'translateX(0)';
         if (swipe.opened === card) swipe.opened = null;
       }
-    } else if (!swipe.moved) {
-      // 点击卡片：多选模式勾选；普通模式进详情（点 RSS 原文链接不跳转）
-      var nid2 = Number(card.dataset.nid);
-      var t = e && e.target;
-      var linkA = t && t.closest ? t.closest('a[data-open-link]') : null;
-      if (state.multi) toggleSel(nid2);
-      else if (!linkA) go('#/news/edit?id=' + nid2);
     }
     resetSwipe();
   }
@@ -416,11 +445,19 @@
         else if (act === 'fav' && nid != null) doFav(nid);
         else if (act === 'clear-sel') clearSelected();
         else if (act === 'multi-exit') toggleMulti();
+        else if (act === 'sel-all') toggleSelectAll();
         return;
       }
       // 多选模式点卡片本身也勾选
       var c = e.target.closest('.news-card');
-      if (c && state.multi) toggleSel(Number(c.dataset.nid));
+      if (c) {
+        var nid3 = Number(c.dataset.nid);
+        if (state.multi) { toggleSel(nid3); return; }
+        // 点开即已读：点 RSS 原文链接（浏览器新开）或进详情都标记已读
+        var linkA2 = e.target.closest ? e.target.closest('a[data-open-link]') : null;
+        markRead(nid3);
+        if (!linkA2) go('#/news/edit?id=' + nid3);
+      }
     });
     on(page, 'pointerdown', onPointerDown);
   }

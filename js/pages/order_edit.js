@@ -74,7 +74,9 @@
       isBundle: false,
       splitMode: 'per_item',
       bodyMode: 'per_item',
-      orderImage: null
+      orderImage: null,
+      preAddGid: null,
+      preAddApplied: false
     };
   }
 
@@ -85,6 +87,8 @@
     var idParam = params.get('id');
     var hasId = !!(idParam != null && idParam !== '' && isFinite(Number(idParam)) && Number(idParam));
     state.isNew = !hasId;
+    var addGid = params.get('add_gid');
+    state.preAddGid = (addGid != null && addGid !== '' && isFinite(Number(addGid))) ? Number(addGid) : null;
 
     return Promise.all([S.getAll('goods'), S.getAll('enums')]).then(function (r) {
       state.goodsList = r[0] || [];
@@ -533,6 +537,29 @@
 
   // ---- 添加谷子 ----
 
+  /** 从谷子库跳转进入（add_gid）：把该谷子预填进清单（已存在则不重复添加） */
+  function applyPreAdd() {
+    var gid = state.preAddGid;
+    if (gid == null || !state.goodsById[gid]) return;
+    var g = state.goodsById[gid];
+    var dup = state.items.some(function (it) { return Number(it.goods_id) === Number(gid); });
+    if (dup) {
+      UI.toast('该谷子已在订单中，未重复添加', 'info');
+      state.preAddGid = null;
+      return;
+    }
+    state.items.push({
+      id: null, _new: true, goods_id: Number(g.id), _gname: g.name || '未命名',
+      _market_price: (g.market_price != null ? g.market_price : null),
+      quantity: 1, unit_price: null, currency: state.order.currency || 'CNY',
+      shipping_share: 0, channel: state.order.channel || '', status: 'shipping',
+      price_status: 'unknown', note: '', sold_quantity: 0
+    });
+    state.preAddGid = null;
+    state.preAddApplied = true;
+    UI.toast('已从谷子库带入：' + (g.name || '未命名') + '，请填写本体单价', 'success');
+  }
+
   function askText(opts) {
     return new Promise(function (resolve) {
       var ref = UI.sheet({
@@ -951,7 +978,12 @@
     return load(ctx).then(function () {
       if (state.destroyed) return;
       ctx.setTitle(state.isNew ? '新增订单' : '订单详情');
+      applyPreAdd();
       render();
+      if (state.preAddApplied) {
+        state.preAddApplied = false;
+        if (state.splitMode !== 'manual') setTimeout(function () { applySplit(); }, 0);
+      }
     }, function (err) {
       if (!(err && err.expected)) console.error('[EATG] 订单编辑页加载失败', err);
       UI.toast('加载失败：' + (err && err.message || err), 'error');

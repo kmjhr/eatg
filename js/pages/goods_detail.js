@@ -56,6 +56,7 @@
       purchases: [],
       sales: [],
       prices: [],
+      orders: [],
       characters: [],
       byChar: {},
       enums: {},
@@ -134,7 +135,8 @@
       S.query('sale_items', 'goods_id', id),
       S.query('price_records', 'goods_id', id),
       S.getAll('characters'),
-      S.getAll('enums')
+      S.getAll('enums'),
+      S.getAll('orders')
     ]).then(function (r) {
       if (!r[0]) throw expectedError('未找到该谷子款（id=' + id + '）');
       state.goods = r[0];
@@ -147,6 +149,7 @@
       var em = {};
       (r[5] || []).forEach(function (row) { em[row.key] = row.values || []; });
       state.enums = em;
+      state.orders = r[6] || [];
       state.agg = A.computeGoodsAgg(state.goods, state.purchases, state.sales);
     });
   }
@@ -244,7 +247,10 @@
   function timelineHTML() {
     var list = sortedPurchases();
     var head = '<div class="block-head"><h3 class="block-title">购入记录（' + list.length + '）</h3>' +
-      '<button type="button" class="block-action" data-act="add-purchase">＋ 新增购入记录</button></div>';
+      '<div class="block-actions">' +
+      '<button type="button" class="block-action" data-act="join-order">＋ 加入订单</button>' +
+      '<button type="button" class="block-action" data-act="add-purchase">＋ 新增购入记录</button>' +
+      '</div></div>';
     if (!list.length) {
       return '<section class="block">' + head + '<p class="empty-line">暂无购入记录</p></section>';
     }
@@ -448,6 +454,7 @@
       if (a === 'add-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&newp=1'); return; }
       if (a === 'edit-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&pid=' + act.dataset.pid); return; }
       if (a === 'goto-order') { go('#/order/edit?id=' + act.dataset.oid); return; }
+      if (a === 'join-order') { openJoinOrderSheet(); return; }
       if (a === 'add-sale') { openSaleSheet(); return; }
       if (a === 'edit-sale') { go('#/sale/edit?sid=' + act.dataset.sid); return; }
       if (a === 'del-sale') { doDeleteSale(Number(act.dataset.sid)); return; }
@@ -476,6 +483,41 @@
   function go(hash) {
     if (EATG.app && EATG.app.navigate) EATG.app.navigate(hash);
     else global.location.hash = hash;
+  }
+
+  // ---- 加入订单（合单）：谷子库 → 选择已有订单 / 新建，自动带入订单编辑页 ----
+
+  function openJoinOrderSheet() {
+    var orders = state.orders.slice().sort(function (a, b) {
+      return String(b.order_date || '').localeCompare(String(a.order_date || '')) || (Number(b.id) - Number(a.id));
+    });
+    var rows = orders.map(function (o) {
+      return '<button type="button" class="opt-row" data-oid="' + o.id + '">' +
+        '<span>' + UI.esc(o.order_name || '未命名订单') + '</span>' +
+        '<span class="muted">' + UI.esc(o.order_date || '—') + ' · ' + UI.esc(o.channel || '') + '</span>' +
+        '</button>';
+    }).join('');
+    var ref = UI.sheet({
+      title: '加入订单（合单）',
+      bodyHTML: '<div class="opt-list">' +
+        '<button type="button" class="opt-row" data-act="new-order"><span>＋ 新建订单</span><span class="opt-check">›</span></button>' +
+        (orders.length ? rows : '<p class="empty-line">还没有订单，可先新建一笔</p>') +
+        '</div>',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="close">关闭</button>'
+    });
+    ref.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-oid],[data-act="new-order"]');
+      if (!b) return;
+      ref.close();
+      if (b.dataset.act === 'new-order') {
+        go('#/order/edit?mode=new&add_gid=' + state.goodsId);
+      } else {
+        go('#/order/edit?id=' + b.dataset.oid + '&add_gid=' + state.goodsId);
+      }
+    });
+    ref.foot.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="close"]')) ref.close();
+    });
   }
 
   // ---- 全屏查看 ----

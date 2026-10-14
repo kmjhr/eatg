@@ -47,7 +47,7 @@
       search: '',
       groupBySeries: false, // 默认不分组（平铺全部条目），可点「按系列分组」切换
       swipeMode: false,
-      autoOwn: false // 刷卡「右滑点亮」开关：默认关闭防误触
+      autoOwn: false // 常规图鉴「点亮模式」开关：默认关闭防误触（打开后点击卡片点亮拥有）
     };
     resetDeck();
   }
@@ -404,24 +404,8 @@
   function advanceDeck(dir) {
     deck.locked = false;
     var item = deck.items[deck.pos];
-    var changed = false, prevOwned = false;
-    if (item) {
-      prevOwned = !!item.owned;
-      if (dir > 0 && state.autoOwn) {   // 右滑点亮仅在开关打开时生效（默认关闭防误触）
-        var st = computeItemState(item);
-        if (st.state === 'none') {          // 右滑 = 标记拥有（仅未拥有时）
-          item.owned = true;
-          S.put('gallery_items', item).then(function () {});
-          changed = true;
-        }
-      }
-      deck.history.push({ iid: item.id, changed: changed, prevOwned: prevOwned });
-    }
+    if (item) deck.history.push({ iid: item.id, changed: false, prevOwned: !!item.owned });
     deck.pos++;
-    if (changed) {
-      updateProgUI();
-      UI.toast('已标记拥有', 'success');
-    }
     rebuildDeck();
   }
 
@@ -539,8 +523,15 @@
   function toolbarHTML() {
     return '<div class="gal-toolbar">' +
       '<input id="gal-search" class="input" type="text" placeholder="搜索条目名称" value="' + esc(state.search) + '">' +
-      '<button type="button" class="btn btn--secondary" id="gal-group-btn">' + (state.groupBySeries ? '取消分组' : '按系列分组') + '</button>' +
-      '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
+      '<div class="gal-toolbar-row">' +
+        '<button type="button" class="btn btn--secondary" id="gal-group-btn">' + (state.groupBySeries ? '取消分组' : '按系列分组') + '</button>' +
+        '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
+      '</div>' +
+      '<div class="gal-swipe-opt">' +
+        '<label class="switch"><input type="checkbox" id="gal-tap-own"' + (state.autoOwn ? ' checked' : '') + '><span class="switch-track"></span>' +
+          '<span class="switch-label">点亮模式（点击卡片标记拥有）</span></label>' +
+        '<span class="gal-swipe-opt-tip">默认关闭防误触 · 打开后点击卡片 = 点亮/取消</span>' +
+      '</div>' +
     '</div>';
   }
 
@@ -553,17 +544,12 @@
           '<button type="button" class="btn btn--secondary btn--sm" id="gal-swipe-exit">‹ 网格</button>' +
           '<div class="gal-swipe-count" id="gal-swipe-count"></div>' +
         '</div>' +
-        '<div class="gal-swipe-opt">' +
-          '<label class="switch"><input type="checkbox" id="gal-auto-own"' + (state.autoOwn ? ' checked' : '') + '><span class="switch-track"></span>' +
-            '<span class="switch-label">右滑点亮（标记拥有）</span></label>' +
-          '<span class="gal-swipe-opt-tip">默认关闭防误触</span>' +
-        '</div>' +
         '<div class="gal-deck" id="gal-deck"></div>' +
-        '<div class="gal-swipe-tip">左右滑动翻卡 · 点卡片看详情 · 开关打开时右滑 = 点亮已拥有</div>' +
+        '<div class="gal-swipe-tip">左右滑动翻卡 · 点卡片看详情</div>' +
         '<div class="gal-swipe-actions">' +
           '<button type="button" class="btn btn--secondary" id="gal-swipe-skip">‹ 跳过</button>' +
           '<button type="button" class="btn btn--secondary" id="gal-swipe-undo">上一步</button>' +
-          '<button type="button" class="btn btn--primary" id="gal-swipe-own">拥有 ›</button>' +
+          '<button type="button" class="btn btn--primary" id="gal-swipe-own">下一张 ›</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -736,20 +722,30 @@
       state.swipeMode = true;
       rerender();
     });
+    var to = document.getElementById('gal-tap-own');
+    if (to) on(to, 'change', function () { state.autoOwn = to.checked; });
     on(page, 'click', function (e) {
       if (Date.now() - lastDetailClose < 350) return; // 详情刚关闭，忽略穿透点击
       var card = e.target.closest('.gal-card');
       if (card) {
         var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
-        if (it) openDetail(it);
+        if (!it) return;
+        if (state.autoOwn) {
+          // 点亮模式：点击切换拥有（点亮/取消），已拥有的再点取消
+          it.owned = !it.owned;
+          S.put('gallery_items', it).then(function () {
+            UI.toast(it.owned ? '已点亮：' + it.name : '已取消点亮：' + it.name, 'success');
+          }).catch(function () { UI.toast('保存失败', 'error'); });
+          rerender();
+        } else {
+          openDetail(it);
+        }
       }
     });
   }
 
   // ---- 刷卡模式：顶部控制条 + 底部按钮 + 点击详情 ----
   function bindSwipeControls(page) {
-    var ao = document.getElementById('gal-auto-own');
-    if (ao) on(ao, 'change', function () { state.autoOwn = ao.checked; });
     on(page, 'click', function (e) {
       if (e.target.closest('.gal-deck-stamp')) return;
       var btn = e.target.closest('button[id]');

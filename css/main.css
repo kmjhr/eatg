@@ -1614,7 +1614,9 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-prog-count .num{font-weight:700;color:var(--accent,#FFDD88)}
 .gal-prog-bar{height:8px;background:var(--fill,#eee);border-radius:999px;overflow:hidden}
 .gal-prog-fill{height:100%;background:var(--accent,#FFDD88);border-radius:999px;transition:width .4s ease}
-.gal-toolbar{display:flex;gap:8px;padding:0 12px 8px}
+.gal-toolbar{display:flex;flex-direction:column;gap:6px;padding:0 12px 8px}
+.gal-toolbar-row{display:flex;gap:8px}
+.gal-toolbar-row .btn{flex:1;min-width:0}
 .gal-toolbar .input{flex:1}
 .gal-grid{padding:0 12px 24px}
 .gal-group{margin-bottom:14px}
@@ -1643,6 +1645,7 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-swipe{display:flex;flex-direction:column;align-items:center;padding:0 12px 24px}
 .gal-swipe-head{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:360px;margin:2px auto 10px}
 .gal-swipe-opt{display:flex;align-items:center;gap:8px;width:100%;max-width:360px;margin:0 auto 8px;padding:0 2px}
+.gal-toolbar .gal-swipe-opt{margin:0 auto 0}
 .gal-swipe-opt .switch-label{font-size:12px}
 .gal-swipe-opt-tip{font-size:10px;color:var(--muted,#888)}
 .gal-swipe-count{font-size:13px;color:var(--muted,#888)}

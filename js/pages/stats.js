@@ -32,6 +32,8 @@
   function clearOffs() { offs.forEach(function (t) { t[0].removeEventListener(t[1], t[2], t[3]); }); offs = []; }
   function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
   function money(c) { return U.fmtMoney(c, 'CNY'); }
+  /** 紧凑金额（整元，含千分位）：用于柱顶成本标注，避免小数点过长 */
+  function moneyShort(c) { return '¥' + Math.round(num(c) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function esc(s) { return UI.esc(s == null ? '' : String(s)); }
   function clone(o) { var r = {}; for (var k in o) { if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; } return r; }
 
@@ -111,16 +113,17 @@
     return order.map(function (k) { return map[k]; });
   }
 
-  /** 月度花费（按 buy_date 月份，金额=购入成本 filled+estimated） */
+  /** 月度花费（按 buy_date 月份，金额=购入成本 filled+estimated，count=该月购入件数） */
   function monthlySpending(model) {
     var map = {}, order = [];
     (model.purchases || []).forEach(function (p) {
       var d = p.buy_date || '';
       var m = d.slice(0, 7);
       if (!m) return;
-      if (!map[m]) { map[m] = { label: m, cost: 0, ship: 0 }; order.push(m); }
+      if (!map[m]) { map[m] = { label: m, cost: 0, ship: 0, count: 0 }; order.push(m); }
       map[m].cost += A.purchaseCost(p);
       map[m].ship += num(p.shipping_share);
+      map[m].count += num(p.quantity);
     });
     // 未分摊订单邮费也按月度计入
     (model.orders || []).forEach(function (o) {
@@ -128,7 +131,7 @@
       var d = o.order_date || o.created_at || '';
       var m = String(d).slice(0, 7);
       if (!m) return;
-      if (!map[m]) { map[m] = { label: m, cost: 0, ship: 0 }; order.push(m); }
+      if (!map[m]) { map[m] = { label: m, cost: 0, ship: 0, count: 0 }; order.push(m); }
       map[m].ship += num(o.shipping_fee);
     });
     order.sort();
@@ -228,8 +231,8 @@
     return { arcs: arcs, cx: cx, cy: cy, r: r, ir: ir };
   }
 
-  /** 柱状图：data=[{label,value}], 返回 bars 点击检测 */
-  function drawBars(canvas, data, color) {
+  /** 柱状图：data=[{label,value}], fmt=柱顶数值格式化（如成本金额），返回 bars 点击检测 */
+  function drawBars(canvas, data, color, fmt) {
     var dpr = global.devicePixelRatio || 1;
     var rect = canvas.getBoundingClientRect();
     var w = rect.width, h = Math.min(rect.height || 160, 160);
@@ -248,6 +251,7 @@
     var gap = (w - pad * 2) / data.length;
     var chartH = h - pad;
 
+    ctx.textAlign = 'center';
     data.forEach(function (d, i) {
       var x = pad + i * gap + (gap - barW) / 2;
       var bh = (num(d.value) / max) * (chartH - 8);
@@ -255,10 +259,15 @@
       ctx.fillStyle = color || PALETTE[0];
       ctx.fillRect(x, y, barW, bh);
       bars.push({ x: x, y: y, w: barW, h: bh, data: d });
-      // 标签
+      // 柱顶数值（成本），贴柱顶上方，略避让顶边
+      if (fmt) {
+        ctx.fillStyle = '#666';
+        ctx.font = '9px system-ui';
+        ctx.fillText(fmt(num(d.value)), x + barW / 2, Math.max(y - 4, 10));
+      }
+      // 底部月份标签
       ctx.fillStyle = '#888';
       ctx.font = '10px system-ui';
-      ctx.textAlign = 'center';
       ctx.fillText(String(d.label).slice(5) || d.label, x + barW / 2, h - 6);
     });
     // 基线
@@ -287,7 +296,9 @@
       var s = a.start, e = a.end;
       if (s < -Math.PI / 2) s += Math.PI * 2;
       if (e < -Math.PI / 2) e += Math.PI * 2;
-      if (ang >= s && ang <= e) return a.data;
+      // 返回底层分组（含成本 value / 件数 count / 构成 items），
+      // 勿返回绘图用的 segment（其 value 是件数、无 items）——否则详情退化为「N 件」。
+      if (ang >= s && ang <= e) return (a.data && a.data.data) ? a.data.data : a.data;
     }
     return null;
   }
@@ -355,7 +366,7 @@
       chartBlockHTML('chart-type', '类型占比', hint) +
       chartBlockHTML('chart-status', '状态占比', '按剩余件数 · 点扇区看成本（含估算，未知计 0）') +
       '<div class="chart-block chart-block--wide">' +
-        '<div class="chart-title">月度花费<span class="chart-hint">柱状=成本，折线=邮费占比</span></div>' +
+        '<div class="chart-title">月度花费<span class="chart-hint">柱=成本（柱顶金额），点柱看件数/成本/邮费</span></div>' +
         '<div class="chart-body"><canvas id="chart-month"></canvas></div>' +
         '<div class="chart-detail" id="chart-month-detail"></div>' +
       '</div>' +
@@ -478,14 +489,24 @@
     // 月度花费
     var monthData = monthlySpending(state.model);
     var monthCanvas = document.getElementById('chart-month');
-    var monthBars = drawBars(monthCanvas, monthData.map(function (m) { return { label: m.label, value: m.cost }; }), PALETTE[0]);
+    var monthBars = drawBars(monthCanvas, monthData.map(function (m) { return { label: m.label, value: m.cost }; }), PALETTE[0], moneyShort);
     chartRefs.push({ canvas: monthCanvas, bars: monthBars, type: 'bar', data: monthData });
   }
 
   function showDetail(detailId, data, kind) {
     var el = document.getElementById(detailId);
     if (!el || !data) { el.innerHTML = ''; return; }
-    // 防御：极端情况下分组无 items（不应发生）——显示件数
+    // 月度：同时展示件数、成本与邮费（须先于下方回退分支——月度分组无 items）
+    if (data.cost != null && data.ship != null) {
+      el.innerHTML = '<div class="chart-detail-row">' +
+        '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
+        (data.count != null ? '<span class="chart-detail-meta">' + num(data.count) + ' 件</span>' : '') +
+        '<span class="chart-detail-meta">成本 ' + money(num(data.cost)) + '</span>' +
+        '<span class="chart-detail-meta">邮费 ' + money(num(data.ship)) + '</span>' +
+      '</div>';
+      return;
+    }
+    // 防御：极端情况下分组无 items（不应发生）——仅显示件数
     if (data.items == null) {
       el.innerHTML = '<div class="chart-detail-row">' +
         '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
@@ -496,15 +517,6 @@
     var val = kind === 'ship' ? money(num(data.ship)) : money(num(data.value));
     var meta = data.count != null ? data.count + ' 件' : '';
     if (num(data.unknown) > 0) meta += '（含 ' + num(data.unknown) + ' 件未知价）';
-    // 月度：同时展示成本与邮费
-    if (data.cost != null && data.ship != null) {
-      el.innerHTML = '<div class="chart-detail-row">' +
-        '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
-        '<span class="chart-detail-meta">成本 ' + money(num(data.cost)) + '</span>' +
-        '<span class="chart-detail-meta">邮费 ' + money(num(data.ship)) + '</span>' +
-      '</div>';
-      return;
-    }
     var head = '<div class="chart-detail-row">' +
       '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
       '<span class="chart-detail-value">' + val + '</span>' +

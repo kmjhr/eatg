@@ -289,6 +289,7 @@
             : '') +
         '</div>' +
         '<span class="tl-edit">编辑 ›</span>' +
+        '<span class="tl-del" data-act="del-purchase" data-pid="' + p.id + '">删除</span>' +
         '</article>';
     }).join('');
     return '<section class="block">' + head + '<div class="timeline">' + items + '</div></section>';
@@ -463,6 +464,7 @@
       if (a === 'edit-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&pid=' + act.dataset.pid); return; }
       if (a === 'goto-order') { go('#/order/edit?id=' + act.dataset.oid); return; }
       if (a === 'toggle-bag') { toggleBag(act.dataset.pid); return; }
+      if (a === 'del-purchase') { doDeletePurchase(Number(act.dataset.pid)); return; }
       if (a === 'join-order') { openJoinOrderSheet(); return; }
       if (a === 'add-sale') { openSaleSheet(); return; }
       if (a === 'edit-sale') { go('#/sale/edit?sid=' + act.dataset.sid); return; }
@@ -521,11 +523,114 @@
       if (b.dataset.act === 'new-order') {
         go('#/order/edit?mode=new&add_gid=' + state.goodsId);
       } else {
-        go('#/order/edit?id=' + b.dataset.oid + '&add_gid=' + state.goodsId);
+        var oid = Number(b.dataset.oid);
+        // 已有未关联订单的购入记录 → 直接并入（不新增记录）；没有则走订单编辑页预填
+        var pendings = state.purchases.filter(function (p) { return p.order_id == null; });
+        if (pendings.length) openMergePickSheet(oid, pendings);
+        else go('#/order/edit?id=' + oid + '&add_gid=' + state.goodsId);
       }
     });
     ref.foot.addEventListener('click', function (e) {
       if (e.target.closest('[data-act="close"]')) ref.close();
+    });
+  }
+
+  // ---- 合并入已有订单（不新增记录）：选择已有订单后，把某条购入记录直接关联到订单 ----
+  function openMergePickSheet(oid, pendings) {
+    var rows = pendings.map(function (p) {
+      var price = p.unit_price != null ? money(p.unit_price, p.currency) : '单价未知';
+      var st = A.STATUS_LABELS[p.status] || p.status || '';
+      return '<button type="button" class="opt-row" data-pid="' + p.id + '">' +
+        '<span>' + UI.esc(p.buy_date || '—') + ' · ×' + num(p.quantity) + ' ' + price + '</span>' +
+        '<span class="muted">' + UI.esc(st) + '</span></button>';
+    }).join('');
+    var ref = UI.sheet({
+      title: '选择要并入的记录',
+      bodyHTML: '<p class="hint">找到 ' + pendings.length + ' 条未关联订单的购入记录，选一条并入（记录数不变）。</p>' +
+        '<div class="opt-list">' + rows + '</div>',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="close">取消</button>'
+    });
+    ref.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pid]');
+      if (!b) return;
+      ref.close();
+      mergePurchaseIntoOrder(Number(b.dataset.pid), oid);
+    });
+    ref.foot.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="close"]')) ref.close();
+    });
+  }
+
+  function mergePurchaseIntoOrder(pid, oid) {
+    var p = null;
+    state.purchases.forEach(function (it) { if (Number(it.id) === Number(pid)) p = it; });
+    if (!p) { UI.toast('购入记录不存在', 'error'); return; }
+    var pRec = clone(p);
+    pRec.order_id = Number(oid);
+    S.get('orders', oid).then(function (o) {
+      var ops = [{ action: 'put', store: 'purchase_items', value: pRec }];
+      if (!o || o.is_bundle) return ops; // 整盒总价手动维护，不自动重算
+      return S.query('purchase_items', 'order_id', oid).then(function (items) {
+        var sum = 0;
+        (items || []).forEach(function (it) { if (it.unit_price != null) sum += num(it.unit_price) * num(it.quantity); });
+        if (pRec.unit_price != null) sum += num(pRec.unit_price) * num(pRec.quantity);
+        o.goods_total = Math.round(sum * 100) / 100;
+        ops.push({ action: 'put', store: 'orders', value: o });
+        return ops;
+      });
+    }).then(function (ops) {
+      return S.bulk(['purchase_items', 'orders'], ops);
+    }).then(function () {
+      UI.toast('已并入订单，记录数不变', 'success');
+      return refresh();
+    }).catch(function (err) {
+      if (!(err && err.expected)) console.error('[EATG] 并入订单失败', err);
+      UI.toast('并入失败：' + (err && err.message || err), 'error');
+    });
+  }
+
+  // ---- 删除单条购入记录（卖出引用则禁删；订单同步移除并重算总额）----
+  function doDeletePurchase(pid) {
+    var p = null;
+    state.purchases.forEach(function (it) { if (Number(it.id) === Number(pid)) p = it; });
+    if (!p) { UI.toast('购入记录不存在', 'error'); return; }
+    S.query('sale_items', 'purchase_item_id', pid).then(function (sales) {
+      if (sales && sales.length) { UI.toast('该记录已关联卖出记录，请先删除对应卖出记录', 'error'); return; }
+      UI.confirmDialog({
+        title: '删除购入记录',
+        message: '确认删除该条购入记录？' + (p.order_id != null ? '它将同时从关联订单中移除，并重算订单总额。' : ''),
+        confirmText: '删除',
+        danger: true
+      }).then(function (ok) {
+        if (!ok) return;
+        var ops = [{ action: 'del', store: 'purchase_items', key: pid }];
+        var oid = p.order_id;
+        var orderTask = (oid != null) ? S.get('orders', oid) : Promise.resolve(null);
+        orderTask.then(function (o) {
+          if (!o || o.is_bundle) return ops;
+          return S.query('purchase_items', 'order_id', oid).then(function (items) {
+            var sum = 0;
+            (items || []).forEach(function (it) {
+              if (Number(it.id) !== Number(pid) && it.unit_price != null) sum += num(it.unit_price) * num(it.quantity);
+            });
+            o.goods_total = Math.round(sum * 100) / 100;
+            ops.push({ action: 'put', store: 'orders', value: o });
+            return ops;
+          });
+        }).then(function (ops2) {
+          var g = clone(state.goods);
+          var nextPurchases = state.purchases.filter(function (it) { return Number(it.id) !== Number(pid); });
+          g.agg = A.computeGoodsAgg(g, nextPurchases, state.sales);
+          ops2.push({ action: 'put', store: 'goods', value: g });
+          return S.bulk(['purchase_items', 'orders', 'goods'], ops2);
+        }).then(function () {
+          UI.toast('已删除购入记录', 'success');
+          return refresh();
+        }).catch(function (err) {
+          if (!(err && err.expected)) console.error('[EATG] 删除购入记录失败', err);
+          UI.toast('删除失败：' + (err && err.message || err), 'error');
+        });
+      });
     });
   }
 

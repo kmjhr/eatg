@@ -1130,6 +1130,7 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
 .tl-qty { font-weight: 600; }
 .tl-note { margin-top: 4px; font-size: 12px; color: var(--ink-2); }
 .tl-edit { flex: 0 0 auto; align-self: center; font-size: 12px; color: var(--ink-3); }
+.tl-del { flex: 0 0 auto; align-self: center; font-size: 12px; color: var(--danger, #E5484D); padding: 0 6px; }
 
 /* 卖出记录 */
 .sales-list { display: flex; flex-direction: column; gap: 10px; }

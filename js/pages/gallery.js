@@ -731,11 +731,9 @@
         var it = state.items.filter(function (x) { return x.id === Number(card.dataset.iid); })[0];
         if (!it) return;
         if (state.autoOwn) {
-          // 点亮模式：点击切换拥有（点亮/取消），已拥有的再点取消
+          // 点亮模式：点击切换拥有（点亮/取消），卡片角标/亮显即反馈，不再弹 toast 避免连点刷屏
           it.owned = !it.owned;
-          S.put('gallery_items', it).then(function () {
-            UI.toast(it.owned ? '已点亮：' + it.name : '已取消点亮：' + it.name, 'success');
-          }).catch(function () { UI.toast('保存失败', 'error'); });
+          S.put('gallery_items', it).catch(function (err) { console.error('[EATG] 点亮保存失败', err); });
           rerender();
         } else {
           openDetail(it);

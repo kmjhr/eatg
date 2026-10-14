@@ -39,6 +39,8 @@
       else console.log('[EATG]', msg);
       return;
     }
+    // 单例替换：新 toast 顶掉旧 toast，避免连续操作堆叠刷屏
+    while (c.firstChild) c.removeChild(c.firstChild);
     var el = document.createElement('div');
     el.className = 'toast' + (type ? ' toast--' + type : '');
     var mark = type === 'success' ? '✓ ' : (type === 'error' ? '✕ ' : '');

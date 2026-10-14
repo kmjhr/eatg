@@ -74,6 +74,8 @@
 
   function resetState() {
     state = {
+      tab: 'library', // 数据管理内部分区：library 收藏库管理 / gallery 图鉴管理（并列切换）
+
       destroyed: false,
       dims: {},
       last_backup_at: null,
@@ -812,14 +814,16 @@
         '<div class="dm-note">恢复前会自动备份当前数据（.pre-restore-时间戳）。仅支持 app=eatg、version≤1 的备份文件。</div>' +
       '</div>' +
 
-      '<div class="dm-block-title">收藏库 · 谷子管理</div>' +
-      enumsHTML() +
-      charsHTML() +
-      quickHTML() +
+      '<div class="dm-tabs">' +
+        '<div class="seg" style="width:100%">' +
+          '<button type="button" class="seg-btn' + (state.tab === 'library' ? ' is-active' : '') + '" data-tab="library">收藏库管理</button>' +
+          '<button type="button" class="seg-btn' + (state.tab === 'gallery' ? ' is-active' : '') + '" data-tab="gallery">图鉴管理</button>' +
+        '</div>' +
+      '</div>' +
 
-      '<div class="dm-block-title">图鉴 · 图鉴管理</div>' +
-      galCharsHTML() +
-      catMgrHTML() +
+      (state.tab === 'gallery'
+        ? '<div class="dm-block-title">图鉴 · 图鉴管理</div>' + galCharsHTML() + catMgrHTML()
+        : '<div class="dm-block-title">收藏库 · 谷子管理</div>' + enumsHTML() + charsHTML() + quickHTML()) +
 
       '<div class="dm-footer">所有数据仅存于本机浏览器，不上传服务器。</div>' +
     '</div>';
@@ -840,6 +844,13 @@
     on(document.getElementById('dm-backup'), 'click', doBackup);
     on(document.getElementById('dm-auto-backup'), 'change', toggleAutoBackup);
     on(document.getElementById('dm-restore'), 'click', triggerRestoreFile);
+    var tabs = document.querySelectorAll('.seg-btn[data-tab]');
+    tabs.forEach(function (btn) {
+      on(btn, 'click', function () {
+        var t = btn.getAttribute('data-tab');
+        if (t && t !== state.tab) { state.tab = t; rerender(); }
+      });
+    });
     if (!dom.manageBound) {
       dom.manageBound = true;
       on(dom.container, 'click', manageClick);

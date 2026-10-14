@@ -71,6 +71,7 @@
       continuous: false,
       priceManual: false,
       bag: null,
+      loc: null,
       currency: 'CNY',
       status: 'on_hand',
       enums: { ip: [], goods_type: [], channel: [] },
@@ -327,6 +328,16 @@
           '</div>' +
           '<p class="hint">该件购入是否带原包装袋。</p>' +
         '</div>' +
+        '<div class="field">' +
+          '<div class="field-head"><span class="field-label">位置</span></div>' +
+          '<div class="chip-select" id="p-loc">' +
+            '<button type="button" class="opt-chip" data-loc="">未标记</button>' +
+            '<button type="button" class="opt-chip" data-loc="home">在家</button>' +
+            '<button type="button" class="opt-chip" data-loc="school">在校</button>' +
+            '<button type="button" class="opt-chip" data-loc="other">其他</button>' +
+          '</div>' +
+          '<p class="hint">该件当前存放位置（详情页可一键切换）。</p>' +
+        '</div>' +
 
         '<div class="ext-area" id="p-ext" hidden>' +
           '<p class="section-sub">定尾预售</p>' +
@@ -390,6 +401,7 @@
     dom.psHint = c.querySelector('#p-ps-hint');
     dom.pnote = c.querySelector('#p-note');
     dom.bag = c.querySelector('#p-bag');
+    dom.loc = c.querySelector('#p-loc');
     dom.ext = c.querySelector('#p-ext');
     dom.deposit = c.querySelector('#p-deposit');
     dom.balance = c.querySelector('#p-balance');
@@ -463,6 +475,14 @@
     });
   }
 
+  function renderLoc() {
+    if (!dom.loc) return;
+    Array.prototype.forEach.call(dom.loc.querySelectorAll('[data-loc]'), function (b) {
+      var on = String(state.loc == null ? '' : state.loc) === b.dataset.loc;
+      b.classList.toggle('is-on', on);
+    });
+  }
+
   function updatePriceStatusUI() {
     var ps = currentPriceStatus();
     dom.psNow.textContent = A.PRICE_LABELS[ps] || ps;
@@ -508,6 +528,8 @@
     dom.psManual.checked = state.priceManual;
     state.bag = (p.has_bag == null) ? null : !!p.has_bag;
     renderBag();
+    state.loc = p.location || null;
+    renderLoc();
     dom.pnote.value = p.note || '';
 
     dom.deposit.value = centsToYuan(p.deposit);
@@ -588,6 +610,14 @@
       else if (b.dataset.bag === '0') state.bag = false;
       else state.bag = null;
       renderBag();
+    });
+
+    // 位置四态
+    on(dom.loc, 'click', function (e) {
+      var b = e.target.closest('[data-loc]');
+      if (!b) return;
+      state.loc = b.dataset.loc || null;
+      renderLoc();
     });
 
     // 连续录入
@@ -908,6 +938,7 @@
         status: state.status,
         price_status: currentPriceStatus(),
         has_bag: state.bag,
+        location: state.loc,
         deposit: depositCents,
         balance: balanceCents,
         payment_deadline: dom.deadline.value || '',
@@ -948,6 +979,7 @@
     if (v.purchase.deposit == null) delete rec.deposit; else rec.deposit = v.purchase.deposit;
     if (v.purchase.balance == null) delete rec.balance; else rec.balance = v.purchase.balance;
     if (v.purchase.has_bag == null) delete rec.has_bag; else rec.has_bag = v.purchase.has_bag;
+    if (v.purchase.location == null) delete rec.location; else rec.location = v.purchase.location;
     if (!v.purchase.payment_deadline) delete rec.payment_deadline; else rec.payment_deadline = v.purchase.payment_deadline;
     if (v.purchase.remind_enabled == null) delete rec.remind_enabled; else rec.remind_enabled = v.purchase.remind_enabled;
 
@@ -1029,6 +1061,7 @@
     state.orderId = null;
     state.priceManual = false;
     state.bag = null;
+    state.loc = null;
     state.characterIds = [];
     state.images = [];
     state.tags = [];

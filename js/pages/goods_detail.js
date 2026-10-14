@@ -252,6 +252,14 @@
     return '<button type="button" class="tl-bag ' + cls + '" data-act="toggle-bag" data-pid="' + p.id + '" title="点击切换：未标 → 有 → 无">' + label + '</button>';
   }
 
+  /** 位置按钮：未标（null）→ 在家（home）→ 在校（school）→ 其他（other）→ 未标 */
+  function locBtnHTML(p) {
+    var v = p.location;
+    var cls = v === 'home' ? 'is-yes' : (v === 'school' ? 'is-sch' : (v === 'other' ? 'is-oth' : 'is-off'));
+    var label = v === 'home' ? '位置·在家' : (v === 'school' ? '位置·在校' : (v === 'other' ? '位置·其他' : '位置·未标'));
+    return '<button type="button" class="tl-loc ' + cls + '" data-act="toggle-loc" data-pid="' + p.id + '" title="点击切换：未标 → 在家 → 在校 → 其他">' + label + '</button>';
+  }
+
   function timelineHTML() {
     var list = sortedPurchases();
     var head = '<div class="block-head"><h3 class="block-title">购入记录（' + list.length + '）</h3>' +
@@ -274,7 +282,7 @@
         '<div class="tl-body">' +
           '<div class="tl-head">' +
             '<span class="tl-date num">' + UI.esc(p.buy_date || '—') + '</span>' +
-            badgeHTML(p.status) + priceTag + bagBtnHTML(p) +
+            badgeHTML(p.status) + priceTag + bagBtnHTML(p) + locBtnHTML(p) +
           '</div>' +
           '<div class="tl-row"><span class="tl-qty num">' + qty + '</span>' + unit + ship + '</div>' +
           '<div class="tl-row muted"><span>渠道：' + UI.esc(p.channel || '—') + '</span>' +
@@ -464,6 +472,7 @@
       if (a === 'edit-purchase') { go('#/goods/edit?mode=edit&id=' + state.goodsId + '&pid=' + act.dataset.pid); return; }
       if (a === 'goto-order') { go('#/order/edit?id=' + act.dataset.oid); return; }
       if (a === 'toggle-bag') { toggleBag(act.dataset.pid); return; }
+      if (a === 'toggle-loc') { toggleLoc(act.dataset.pid); return; }
       if (a === 'del-purchase') { doDeletePurchase(Number(act.dataset.pid)); return; }
       if (a === 'join-order') { openJoinOrderSheet(); return; }
       if (a === 'add-sale') { openSaleSheet(); return; }
@@ -654,6 +663,30 @@
       UI.toast(p.has_bag === true ? '已标记：有原袋' : (p.has_bag === false ? '已标记：无原袋' : '已取消标记'), 'success');
     }).catch(function (err) {
       if (!(err && err.expected)) console.error('[EATG] 原袋标记失败', err);
+      UI.toast('保存失败：' + (err && err.message || err), 'error');
+    });
+  }
+
+  // ---- 位置标记：点击循环 未标 → 在家 → 在校 → 其他 → 未标，即时保存 ----
+  function toggleLoc(pid) {
+    var p = null;
+    state.purchases.forEach(function (it) { if (Number(it.id) === Number(pid)) p = it; });
+    if (!p) { UI.toast('购入记录不存在', 'error'); return; }
+    var rec = clone(p);
+    if (rec.location == null) rec.location = 'home';
+    else if (rec.location === 'home') rec.location = 'school';
+    else if (rec.location === 'school') rec.location = 'other';
+    else if (rec.location === 'other') delete rec.location;
+    S.put('purchase_items', rec).then(function () {
+      p.location = rec.location;
+      var btn = dom.container.querySelector('.tl-loc[data-pid="' + pid + '"]');
+      if (btn) {
+        btn.className = 'tl-loc ' + (p.location === 'home' ? 'is-yes' : (p.location === 'school' ? 'is-sch' : (p.location === 'other' ? 'is-oth' : 'is-off')));
+        btn.textContent = p.location === 'home' ? '位置·在家' : (p.location === 'school' ? '位置·在校' : (p.location === 'other' ? '位置·其他' : '位置·未标'));
+      }
+      UI.toast(p.location === 'home' ? '已标记：在家' : (p.location === 'school' ? '已标记：在校' : (p.location === 'other' ? '已标记：其他' : '已取消位置标记')), 'success');
+    }).catch(function (err) {
+      if (!(err && err.expected)) console.error('[EATG] 位置标记失败', err);
       UI.toast('保存失败：' + (err && err.message || err), 'error');
     });
   }

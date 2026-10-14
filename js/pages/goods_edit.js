@@ -276,7 +276,8 @@
     var batchEntry = state.mode === 'edit'
       ? ''
       : '<div class="batch-entry"><button type="button" class="btn btn--secondary" data-act="batch-scan">拍照批量录入</button>' +
-        '<p class="hint">拍一张照片，框选多个谷子 → 自动识别数量与文字 → 一键录入多条。</p></div>';
+        '<button type="button" class="btn btn--secondary" data-act="batch-album">多选相册批量</button>' +
+        '<p class="hint">拍一张照片框选多个谷子，或一次从相册多选多张照片（每张 = 1 个谷子），补齐必填项后一键保存。</p></div>';
 
     return '<section class="page page--edit">' +
       prefillNote +
@@ -632,6 +633,7 @@
       var act = e.target.closest('[data-act]');
       if (!act) return;
       if (act.dataset.act === 'batch-scan') { if (EATG.batchScan && EATG.batchScan.open) EATG.batchScan.open(); return; }
+      if (act.dataset.act === 'batch-album') { if (EATG.batchScan && EATG.batchScan.openMulti) EATG.batchScan.openMulti(); return; }
       if (act.dataset.act === 'convert') convertToFullPre();
       else if (act.dataset.act === 'save') doSave();
       else if (act.dataset.act === 'cancel') leave();

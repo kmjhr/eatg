@@ -652,6 +652,69 @@
     });
   };
 
+  // ---- 多选相册批量：每张照片 = 1 个谷子草稿 ----
+
+  /** 读取并压缩图片文件 → dataURL（最长边 maxEdge，JPEG 0.75） */
+  function compressFile(file, maxEdge) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var iw = img.naturalWidth, ih = img.naturalHeight;
+        var scale = Math.min(1, (maxEdge || 800) / Math.max(iw, ih));
+        var cw = Math.max(1, Math.round(iw * scale)), ch = Math.max(1, Math.round(ih * scale));
+        var cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        resolve(cv.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+      img.src = url;
+    });
+  }
+
+  /** 多选相册批量生成：一次选 N 张照片，每张生成 1 条谷子草稿（名称/IP/类型留待确认页补齐） */
+  BS.openMulti = function () {
+    if (view) { UI.toast('请先关闭当前批量录入', 'info'); return; }
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.multiple = true;
+    inp.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(inp.files || []);
+      if (!files.length) return;
+      if (files.length > 9) { UI.toast('一次最多 9 张，请分批选择', 'error'); return; }
+      UI.toast('正在处理 ' + files.length + ' 张照片…', 'info');
+      var items = new Array(files.length);
+      var chain = Promise.resolve();
+      files.forEach(function (f, i) {
+        chain = chain.then(function () {
+          return compressFile(f, 800).then(function (dataUrl) {
+            items[i] = { image: dataUrl, ocrText: '', name: '', ip: '', type: '', charIds: [], qty: 1, status: 'on_hand' };
+          }).catch(function (err) {
+            console.error('[EATG] 第 ' + (i + 1) + ' 张处理失败', err);
+            items[i] = null;
+          });
+        });
+      });
+      chain.then(function () {
+        var valid = items.filter(Boolean);
+        if (!valid.length) { UI.toast('照片处理失败，请重试', 'error'); return; }
+        try {
+          global.localStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), mode: 'album', items: valid }));
+        } catch (e) {
+          UI.toast('照片太多本地存储不下，请分批（建议每批 ≤ 6 张）', 'error');
+          return;
+        }
+        UI.toast('已生成 ' + valid.length + ' 条草稿，请补齐必填项', 'success');
+        if (EATG.app && EATG.app.navigate) EATG.app.navigate('#/goods/batch');
+        else global.location.hash = '#/goods/batch';
+      });
+    });
+    inp.click();
+  };
+
   /** 扩展点：接入自训练物体检测模型后调用（x/y/w/h 为 0~1 归一化坐标，返回 Promise） */
   BS.setDetector = function (fn) { if (view) view.detector = fn; BS._detector = fn; };
   BS._detector = null;

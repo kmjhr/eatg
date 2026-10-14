@@ -38,10 +38,10 @@
   function loadDraft() {
     try {
       var raw = global.localStorage.getItem(DRAFT_KEY);
-      if (!raw) return null;
+      if (!raw) return { items: null, mode: '' };
       var d = JSON.parse(raw);
-      return (d && Array.isArray(d.items)) ? d.items : null;
-    } catch (e) { return null; }
+      return { items: (d && Array.isArray(d.items)) ? d.items : null, mode: d.mode || '' };
+    } catch (e) { return { items: null, mode: '' }; }
   }
 
   function saveDraft(items) {
@@ -111,11 +111,12 @@
   function render() {
     var container = dom.container;
     var html = state.items.map(itemHTML).join('');
+    var isAlbum = state.mode === 'album';
     container.innerHTML =
       '<section class="page page--batch">' +
         '<div class="form-section">' +
-          '<h2 class="section-title">拍照批量录入（' + state.items.length + ' 条）</h2>' +
-          '<p class="hint">已按照片区域拆分，OCR 自动预填；请核对/补齐必填项后一键保存。</p>' +
+          '<h2 class="section-title">' + (isAlbum ? '相册批量录入' : '拍照批量录入') + '（' + state.items.length + ' 条）</h2>' +
+          '<p class="hint">' + (isAlbum ? '每张照片 = 1 个谷子；请补齐名称/IP/类型后一键保存。' : '已按照片区域拆分，OCR 自动预填；请核对/补齐必填项后一键保存。') + '</p>' +
         '</div>' +
         html +
         '<div class="save-spacer" aria-hidden="true"></div>' +
@@ -274,14 +275,16 @@
   // ---- 挂载 / 卸载 ----
 
   function mount(container, ctx) {
+    var draft = loadDraft();
     state = {
       destroyed: false,
-      items: loadDraft() || [],
+      items: draft.items || [],
+      mode: draft.mode || '',
       characters: [],
       enums: { ip: [], goods_type: [], channel: [] }
     };
     dom = { container: container, ctx: ctx };
-    ctx.setTitle('拍照批量录入');
+    ctx.setTitle(state.mode === 'album' ? '相册批量录入' : '拍照批量录入');
     ctx.setBack(true);
 
     if (!state.items.length) {

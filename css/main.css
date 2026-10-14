@@ -1623,6 +1623,10 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-group-title{font-size:12px;font-weight:600;color:var(--ink,#333);margin:6px 0 4px;padding-left:2px}
 .gal-grid-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
 .gal-card{background:var(--card,#fff);border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer}
+.gal-card.is-sortable{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.gal-card.is-sortable:active{cursor:grabbing}
+.gal-sort-drag{position:relative;z-index:30;box-shadow:0 10px 24px rgba(0,0,0,.35);will-change:transform}
+.gal-grid-row.gal-sort-active .gal-card{transition:transform .18s ease,box-shadow .18s ease}
 .gal-card-img{width:100%;aspect-ratio:1/1;background-size:cover;background-position:center;background-color:var(--fill,#eee);position:relative;transition:filter .3s ease,opacity .3s ease}
 .gal-card--owned .gal-card-img{filter:none}
 .gal-card--half .gal-card-img{opacity:.7;filter:none}

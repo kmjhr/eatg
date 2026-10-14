@@ -1,10 +1,11 @@
 /* ==========================================================================
    一咕（EATG）· 拍照批量录入（js/batch_scan.js）
-   能力：拍一张照片 → 检测/手动框选多个谷子区域 → 逐框裁剪 + OCR 智能预填
-         （名称/IP/类型/角色，词表匹配）→ 生成 N 条草稿 → 跳转批量确认页。
-   依赖（按需懒加载，联网可用；离线时仅手动框选批量录入可用）：
-         TensorFlow.js + COCO-SSD（自动识别数量，辅助）
-         Tesseract.js（OCR 中文，提取包装/吊牌文字）
+   能力：拍/选一张照片 → 「自动识别」用本地 OCR 找出包装/吊牌文字区并生成 N 个框
+         （框可拖动/缩放/删除/双击新增）→ 逐框裁剪 + OCR → 关键词命中自动预填
+         （名称/IP/类型/角色）→ 生成 N 条草稿 → 跳转批量确认页。
+   OCR：本地内置 Tesseract.js（vendor/tesseract + vendor/tessdata），完全离线，无外链。
+   说明：物体计数 / 角色识别需自训练模型（见 app/docs/交付说明.md「需训练模型」），
+         本文件预留扩展点 BS.setDetector()，接入后自动识别会额外产出物体框。
    草稿：localStorage eatg_batch_draft（JSON，含逐框裁剪图 dataURL 与预填字段）
    ========================================================================== */
 (function (global) {
@@ -18,77 +19,130 @@
 
   var DRAFT_KEY = 'eatg_batch_draft';
   var MAX_BOXES = 9;
+  var OCR_MAX_EDGE = 1280;   // 整图识别时的最长边（兼顾速度与精度）
+  var CROP_MAX_EDGE = 800;   // 单框裁剪图最长边（草稿体积与 OCR 精度平衡）
+  var OCR_MIN_CONF = 40;     // 词置信度阈值
 
-  var TYPE_WORDS = ['吧唧', '徽章', '立牌', '亚克力', '色纸', '挂件', '玩偶', '手办',
-    '文件夹', '拍立得', '小卡', '闪卡', '透卡', '杯垫', '抱枕', '勋章', '胶片', '镭射票', '应援棒', '画集', '立绘'];
-  var IP_WORDS = ['MyGO', 'BanG Dream', 'BanG Dream!', 'bangdream', '孤独摇滚', '新世纪福音战士', 'EVA',
-    '间谍过家家', '咒术回战', '排球少年', '蓝锁', '进击的巨人', '鬼灭之刃', '初音未来', 'Vocaloid',
-    '东方', '偶像大师', 'Love Live', 'lovelive', '魔法少女小圆', '物语系列', '少女歌剧', '邦邦'];
+  // ---- 本地 OCR 资源（相对本页 baseURI 解析为绝对地址，避免 worker 内相对路径歧义） ----
+  var VENDOR_BASE = (function () {
+    try { return new URL('vendor/', document.baseURI).href; }
+    catch (e) { return 'vendor/'; }
+  })();
+  var TESS = {
+    lib: VENDOR_BASE + 'tesseract/tesseract.min.js',
+    worker: VENDOR_BASE + 'tesseract/worker.min.js',
+    coreSimd: VENDOR_BASE + 'tesseract/tesseract-core-simd-lstm.wasm.js',
+    core: VENDOR_BASE + 'tesseract/tesseract-core-lstm.wasm.js',
+    lang: VENDOR_BASE + 'tessdata'
+  };
+
+  // ---- 关键词词表 ----
+  // 类型同义词 → 规范中文名（同时会优先匹配用户自定义的 enums.goods_type）
+  var TYPE_SYNONYMS = [
+    { canon: '吧唧', words: ['缶バッジ', 'バッジ缶', '缶バッチ', 'バッチ缶', '吧唧', '徽章', '圆形徽章', 'badge', 'can badge', 'グッズ缶'] },
+    { canon: '立牌', words: ['アクリルスタンド', 'スタンドアクリル', 'アクスタ', '亚克力立牌', '立牌', '亚克力', 'acrylic stand', 'acrylic'] },
+    { canon: '挂件', words: ['ラバーストラップ', 'ストラップラバー', 'キーホルダー', '橡胶挂件', '挂件', '钥匙扣', '挂饰', 'rubber strap', 'keychain'] },
+    { canon: '文件夹', words: ['クリアファイル', 'ファイルクリア', '文件夹', 'clear file', 'file folder'] },
+    { canon: '色纸', words: ['色紙', '紙色', '色纸', 'shikishi'] },
+    { canon: '拍立得', words: ['ブロマイド', 'マイドブロ', '拍立得', 'bromide'] },
+    { canon: '小卡', words: ['トレーディングカード', 'カードトレーディング', '小卡', '闪卡', '卡片', '卡牌', 'trading card'] },
+    { canon: '透卡', words: ['クリアカード', 'カードクリア', '透卡', '透明卡'] },
+    { canon: '镭射票', words: ['レーザーチケット', '镭射票', '激光票'] },
+    { canon: '杯垫', words: ['コースター', 'スターコー', '杯垫', 'coaster'] },
+    { canon: '马克杯', words: ['マグカップ', 'カップマグ', '马克杯', 'mug'] },
+    { canon: '挂布', words: ['タペストリー', 'ストリータペ', '挂布', '布画', '挂画', 'tapestry'] },
+    { canon: '抱枕', words: ['抱き枕', '枕き抱', '抱枕', '靠垫', 'cushion'] },
+    { canon: '玩偶', words: ['ぬいぐるみ', 'ぐるみぬい', 'ぬい', '玩偶', '娃娃', '毛绒', 'plush'] },
+    { canon: '手办', words: ['フィギュア', 'ギュアフィ', '手办', 'figure'] },
+    { canon: '应援棒', words: ['ペンライト', '应援棒', '荧光棒', 'penlight'] },
+    { canon: '画集', words: ['画集', '画册', 'art book', 'artbook'] },
+    { canon: '胶片', words: ['クリアファイル', '胶片', 'フィルム'] }
+  ];
+
+  // IP 同义词 → 规范名（会优先映射到用户 enums.ip 中已有的项）
+  var IP_SYNONYMS = [
+    { canon: 'MyGO', words: ['mygo!!!!!', 'mygo', 'マイゴ', '迷星叫'] },
+    { canon: '邦邦', words: ['bang dream!', 'bang dream', 'bangdream', 'バンドリ', 'bandori', '邦ドリ'] },
+    { canon: '孤独摇滚', words: ['ぼっち・ざ・ろっく', 'bocchi', 'ぼざろ', '孤独摇滚'] },
+    { canon: '初音未来', words: ['初音ミク', 'hatsune miku', 'vocaloid', '初音未来'] },
+    { canon: '无期迷途', words: ['无期迷途', 'path to nowhere'] },
+    { canon: '间谍过家家', words: ['spy family', 'spy×family', '间谍过家家'] },
+    { canon: '咒术回战', words: ['呪術廻戦', 'jujutsu kaisen', '咒术回战'] }
+  ];
 
   // 运行时状态（单实例）
   var view = null;
 
-  // ---- 词表匹配 ----
+  // ---- 文本工具 ----
 
-  function matchWords(text, words) {
-    var t = String(text || '').toLowerCase();
-    if (!t) return null;
+  function cleanText(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+  function normText(s) { return String(s || '').toLowerCase().replace(/\s+/g, ''); }
+
+  function matchWords(normedText, words, rawWords) {
+    if (!normedText) return null;
     for (var i = 0; i < words.length; i++) {
-      if (t.indexOf(String(words[i]).toLowerCase()) !== -1) return words[i];
+      if (normedText.indexOf(words[i]) !== -1) return rawWords ? rawWords[i] : words[i];
     }
     return null;
   }
 
-  function cleanText(s) {
-    return String(s || '').replace(/[ \t\r\n]+/g, ' ').trim();
-  }
-
-  // ---- 外部脚本懒加载（仅识别功能需要；离线时手动框选不受影响） ----
+  // ---- 本地 OCR 引擎（懒加载 + 单例） ----
 
   function loadScript(src) {
     return new Promise(function (resolve, reject) {
-      if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+      if (document.querySelector('script[data-eatg-src="' + src + '"]')) { resolve(); return; }
       var s = document.createElement('script');
       s.src = src;
       s.async = true;
+      s.setAttribute('data-eatg-src', src);
       s.onload = function () { resolve(); };
-      s.onerror = function () { reject(new Error('模型加载失败，请检查网络后重试')); };
+      s.onerror = function () { reject(new Error('本地 OCR 库加载失败：' + src)); };
       document.head.appendChild(s);
     });
   }
 
-  var modelPromise = null;
-  function loadDetectModel() {
-    if (modelPromise) return modelPromise;
-    modelPromise = loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js')
-      .then(function () {
-        return loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js');
-      })
-      .then(function () {
-        if (!global.cocoSsd) throw new Error('COCO-SSD 未就绪');
-        return global.cocoSsd.load();
-      });
-    return modelPromise;
+  function simdSupported() {
+    try {
+      return WebAssembly.validate(new Uint8Array([
+        0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0,
+        10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11
+      ]));
+    } catch (e) { return false; }
   }
 
   var ocrPromise = null;
   function loadOcr() {
     if (ocrPromise) return ocrPromise;
-    ocrPromise = loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js')
-      .then(function () {
-        if (!global.Tesseract) throw new Error('Tesseract 未就绪');
-        return global.Tesseract.createWorker('chi_sim+eng', 1, {
-          logger: function (m) {
-            if (m && m.status === 'recognizing text' && m.progress != null) {
-              UI.toast('识别中 ' + Math.round(m.progress * 100) + '%');
-            }
-          }
-        });
+    ocrPromise = loadScript(TESS.lib).then(function () {
+      if (!global.Tesseract) throw new Error('Tesseract 未就绪');
+      var core = simdSupported() ? TESS.coreSimd : TESS.core;
+      setProgress('正在启动识别引擎…', 5);
+      return global.Tesseract.createWorker('chi_sim+eng+jpn', 1, {
+        workerPath: TESS.worker,
+        corePath: core,
+        langPath: TESS.lang,
+        gzip: false,   // 直接读取未压缩的 .traineddata
+        logger: function (m) {
+          if (!m || m.progress == null) return;
+          if (m.status === 'loading tesseract core') setProgress('加载识别核心…', m.progress);
+          else if (m.status === 'loading language traineddata') setProgress('加载中文语言包…', m.progress);
+          else if (m.status === 'initializing tesseract') setProgress('初始化引擎…', m.progress);
+        }
       });
+    }).catch(function (err) {
+      ocrPromise = null;   // 允许重试
+      throw err;
+    });
     return ocrPromise;
   }
 
-  // ---- 全屏弹层（不依赖 UI.sheet，便于画布交互） ----
+  function terminateOcr() {
+    if (!ocrPromise) return;
+    ocrPromise.then(function (w) { try { w.terminate(); } catch (e) {} }).catch(function () {});
+    ocrPromise = null;
+  }
+
+  // ---- 全屏弹层 ----
 
   function openOverlay() {
     var el = document.createElement('div');
@@ -98,13 +152,15 @@
         '<button type="button" class="bs-close" data-act="close" aria-label="关闭">×</button>' +
         '<span class="bs-title">拍照批量录入</span>' +
       '</div>' +
+      '<div class="bs-progress" hidden><span class="bs-progress-text"></span>' +
+        '<span class="bs-progress-bar"><i></i></span></div>' +
       '<div class="bs-stage">' +
         '<canvas class="bs-canvas"></canvas>' +
-        '<div class="bs-empty">点下方「相册 / 拍照」选择照片<br><span class="bs-empty-sub">选图后可框选多个谷子，或点「自动识别数量」先圈一遍</span></div>' +
+        '<div class="bs-empty">点下方「相册 / 拍照」选择照片<br><span class="bs-empty-sub">选图后点「自动识别」圈出吊牌/包装文字区，或双击画面手动加框</span></div>' +
       '</div>' +
       '<div class="bs-foot">' +
         '<button type="button" class="btn btn--secondary" data-act="pick">相册 / 拍照</button>' +
-        '<button type="button" class="btn btn--secondary" data-act="auto">自动识别数量</button>' +
+        '<button type="button" class="btn btn--secondary" data-act="auto">自动识别</button>' +
         '<button type="button" class="btn btn--secondary" data-act="del-box">删选中框</button>' +
         '<button type="button" class="btn btn--primary" data-act="gen">生成录入</button>' +
       '</div>';
@@ -112,7 +168,29 @@
     return el;
   }
 
-  // ---- 图片选择（在弹层内部弹出选项行，避免跨层遮挡；input 覆盖 + 兜底 JS click 双保险） ----
+  function setProgress(text, pct) {
+    if (!view || !view.el) return;
+    var box = view.el.querySelector('.bs-progress');
+    if (!box) return;
+    if (text == null) { box.hidden = true; return; }
+    box.hidden = false;
+    var t = box.querySelector('.bs-progress-text');
+    if (t) t.textContent = text;
+    var i = box.querySelector('.bs-progress-bar i');
+    if (i) i.style.width = Math.round(Math.max(0, Math.min(1, pct || 0)) * 100) + '%';
+  }
+
+  function setBusy(b) {
+    if (!view || !view.el) return;
+    var foot = view.el.querySelector('.bs-foot');
+    if (!foot) return;
+    Array.prototype.forEach.call(foot.querySelectorAll('button'), function (btn) {
+      if (btn.dataset.act === 'close') return;
+      btn.disabled = !!b;
+    });
+  }
+
+  // ---- 图片选择 ----
 
   function loadFile(file) {
     if (!file || !view || view.destroyed) return;
@@ -122,8 +200,7 @@
       URL.revokeObjectURL(url);
       if (view && view.destroyed) return;
       view.img = img;
-      var fr = fitRect(img.naturalWidth, img.naturalHeight, view.canvas.clientWidth, view.canvas.clientHeight);
-      view.fit = fr;
+      view.fit = fitRect(img.naturalWidth, img.naturalHeight, view.canvas.clientWidth, view.canvas.clientHeight);
       view.canvas.width = view.canvas.clientWidth;
       view.canvas.height = view.canvas.clientHeight;
       view.boxes = [];
@@ -155,7 +232,6 @@
           '<span class="opt-check">›</span></span>' +
         '</div>';
       view.el.appendChild(opts);
-      // 通道1：input 覆盖真实触摸；通道2：覆盖失效时按钮兜底 JS click（两路互斥）
       opts.addEventListener('change', function (e) {
         var inp = e.target.closest('input[type=file]');
         if (!inp) return;
@@ -245,13 +321,10 @@
     var down = null;
     function onDown(e) {
       e.preventDefault();
+      if (view.busy) return;
       var p = evPos(e);
       var hit = hitTest(p);
-      if (!hit) {
-        view.sel = -1;
-        draw();
-        return;
-      }
+      if (!hit) { view.sel = -1; draw(); return; }
       view.sel = hit.i;
       down = { kind: hit.kind, h: hit.h, start: p, box: {
         x: view.boxes[hit.i].x, y: view.boxes[hit.i].y,
@@ -277,6 +350,8 @@
         if (h === 1 || h === 3) { nh = Math.max(0.03, p.y - s.y); }
         b.x = nx; b.y = ny; b.w = nw; b.h = nh;
       }
+      // 手动改动后该框的 OCR 文本作废，生成时重新识别
+      b.text = null;
       draw();
     }
     function onUp() { down = null; }
@@ -295,45 +370,88 @@
     view._handlers = null;
   }
 
-  // ---- 自动识别数量（COCO-SSD，联网辅助） ----
+  // ---- 自动识别：本地 OCR → 文字区聚类 → 生成框 ----
+
+  /** 解析 Tesseract TSV 词表，按 块-段 聚合成文字区（含包围框与文本） */
+  function regionsFromTsv(tsv, imgW, imgH) {
+    var groups = {};
+    String(tsv || '').split('\n').forEach(function (line) {
+      var c = line.split('\t');
+      if (c.length < 12) return;
+      if (Number(c[0]) !== 5) return;                 // level 5 = 词
+      var conf = Number(c[10]);
+      var text = String(c[11] || '').trim();
+      if (!text || !(conf >= OCR_MIN_CONF)) return;
+      var key = c[2] + '-' + c[3];                    // block-par
+      var g = groups[key] || (groups[key] = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9, words: [] });
+      var x = Number(c[6]), y = Number(c[7]), w = Number(c[8]), h = Number(c[9]);
+      g.x0 = Math.min(g.x0, x); g.y0 = Math.min(g.y0, y);
+      g.x1 = Math.max(g.x1, x + w); g.y1 = Math.max(g.y1, y + h);
+      g.words.push({ text: text, x: x, y: y });
+    });
+    var out = [];
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k];
+      if (g.x1 <= g.x0 || g.y1 <= g.y0) return;
+      g.words.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });
+      var x = g.x0 / imgW, y = g.y0 / imgH;
+      var bw = (g.x1 - g.x0) / imgW, bh = (g.y1 - g.y0) / imgH;
+      var area = bw * bh;
+      if (area < 0.002 || area > 0.85) return;        // 过小噪声 / 过大整图
+      out.push({ x: x, y: y, w: bw, h: bh, text: g.words.map(function (w) { return w.text; }).join('') });
+    });
+    out.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });   // 阅读顺序
+    return out.slice(0, MAX_BOXES);
+  }
 
   function autoDetect() {
     if (!view || !view.img) { UI.toast('请先选择照片', 'error'); return; }
-    UI.toast('正在加载识别模型（首次约 10MB，请稍候）…');
-    loadDetectModel().then(function (model) {
-      return model.detect(view.img);
-    }).then(function (preds) {
+    if (view.busy) return;
+    view.busy = true;
+    setBusy(true);
+    setProgress('正在准备识别引擎…', 3);
+    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, OCR_MAX_EDGE);
+
+    loadOcr().then(function (worker) {
+      setProgress('正在识别吊牌/包装文字…', 30);
+      return worker.recognize(cut.url);
+    }).then(function (res) {
       if (!view || view.destroyed) return;
-      var fr = view.fit;
-      var keep = (preds || []).filter(function (p) { return p.score >= 0.5; });
-      // 过滤掉明显占据整图的大框（很可能是背景误检）
-      keep = keep.filter(function (p) {
-        return (p.bbox[2] * p.bbox[3]) < 0.6;
-      });
-      if (!keep.length) {
-        UI.toast('没有识别到明显的物体，可手动框选', 'info');
+      var tsv = (res && res.data && res.data.tsv) || '';
+      var regions = regionsFromTsv(tsv, cut.w, cut.h);
+
+      // 预留：接入自训练物体检测模型（BS.setDetector）后，可额外产出物体框
+      if (!regions.length && view.detector) {
+        return Promise.resolve(view.detector(view.img)).then(function (objs) {
+          (objs || []).forEach(function (o) {
+            if (view.boxes.length >= MAX_BOXES) return;
+            view.boxes.push({ x: o.x, y: o.y, w: o.w, h: o.h, text: null });
+          });
+        });
+      }
+      if (!regions.length) {
+        UI.toast('未识别到文字，可双击画面手动加框', 'info');
         return;
       }
       var prev = view.boxes.length;
-      keep.forEach(function (p) {
+      regions.forEach(function (r) {
         if (view.boxes.length >= MAX_BOXES) return;
-        view.boxes.push({
-          x: Math.max(0, Math.min(1, p.bbox[0] / view.img.naturalWidth)),
-          y: Math.max(0, Math.min(1, p.bbox[1] / view.img.naturalHeight)),
-          w: Math.max(0.03, Math.min(1, p.bbox[2] / view.img.naturalWidth)),
-          h: Math.max(0.03, Math.min(1, p.bbox[3] / view.img.naturalHeight))
-        });
+        view.boxes.push({ x: r.x, y: r.y, w: r.w, h: r.h, text: r.text });
       });
       view.sel = -1;
       draw();
-      UI.toast('已自动圈出 ' + (view.boxes.length - prev) + ' 个区域（' + view.boxes.length + '/9），可拖动/缩放手柄修正', 'success');
+      UI.toast('已识别 ' + (view.boxes.length - prev) + ' 个文字区（共 ' + view.boxes.length + '/' + MAX_BOXES + '），可拖动/缩放修正', 'success');
     }).catch(function (err) {
       console.error('[EATG] 自动识别失败', err);
       UI.toast('自动识别失败：' + (err && err.message || err), 'error');
+    }).then(function () {
+      view.busy = false;
+      setBusy(false);
+      setProgress(null);
     });
   }
 
-  // ---- 裁剪 + OCR + 预填 ----
+  // ---- 裁剪 ----
 
   function cropBox(img, box, targetMax) {
     var iw = img.naturalWidth, ih = img.naturalHeight;
@@ -346,63 +464,111 @@
     cv.width = cw; cv.height = ch;
     var cx = cv.getContext('2d');
     cx.drawImage(img, bx, by, bw, bh, 0, 0, cw, ch);
-    return cv.toDataURL('image/jpeg', 0.8);
+    return { url: cv.toDataURL('image/jpeg', 0.8), w: cw, h: ch };
+  }
+
+  // ---- 关键词预填 ----
+
+  /** 在词表中查同义词，返回规范名（未命中返回 ''） */
+  function synLookup(n, table) {
+    for (var i = 0; i < table.length; i++) {
+      if (matchWords(n, table[i].words.map(normText))) return table[i].canon;
+    }
+    return '';
+  }
+
+  /** 把规范名映射到用户已有枚举项（先精确、后包含；未命中返回 ''） */
+  function resolveEnum(canon, values) {
+    if (!canon) return '';
+    var nc = normText(canon), i;
+    for (i = 0; i < values.length; i++) if (normText(values[i]) === nc) return values[i];
+    for (i = 0; i < values.length; i++) if (normText(values[i]).indexOf(nc) !== -1) return values[i];
+    return '';
   }
 
   function suggestItem(ocrText) {
     var t = cleanText(ocrText);
-    var low = t.toLowerCase();
-    var type = matchWords(t, TYPE_WORDS) || '';
-    var ip = matchWords(t, view.ipWords) || '';
-    var charIds = view.characters.filter(function (c) {
-      return c.name && low.indexOf(String(c.name).toLowerCase()) !== -1;
-    }).map(function (c) { return Number(c.id); });
+    var n = normText(t);
+    var enumTypes = (view.enums && view.enums.goods_type) || [];
+    var enumIps = (view.enums && view.enums.ip) || [];
 
-    var name = '';
-    if (charIds.length && type) {
-      // 用第一个匹配角色 + 类型拼名称
-      var chName = '';
-      view.characters.forEach(function (c) { if (Number(c.id) === charIds[0]) chName = c.name; });
-      name = chName + ' ' + type;
-    } else if (charIds.length) {
-      var chName2 = '';
-      view.characters.forEach(function (c) { if (Number(c.id) === charIds[0]) chName2 = c.name; });
-      name = chName2;
-    } else if (type) {
-      name = type;
-    } else {
-      name = t.slice(0, 20);
+    // 类型：① 直接命中用户枚举 → ② 同义词规范名 → ③ 规范名映射到枚举（吧唧→徽章（吧唧））
+    var type = matchWords(n, enumTypes.map(normText), enumTypes);
+    if (!type) {
+      var tc = synLookup(n, TYPE_SYNONYMS);
+      if (tc) type = resolveEnum(tc, enumTypes) || tc;
     }
+
+    // IP：① 直接命中用户枚举 → ② 同义词规范名 → ③ 映射到枚举（BanG Dream→邦邦）
+    var ip = matchWords(n, enumIps.map(normText), enumIps);
+    if (!ip) {
+      var ic = synLookup(n, IP_SYNONYMS);
+      if (ic) ip = resolveEnum(ic, enumIps) || (enumIps.length ? '' : ic);   // 枚举非空时不塞不存在的值
+    }
+
+    // 角色（附加能力；后续角色识别由深度学习模型接管）
+    var chars = view.characters || [];
+    var charIds = chars.filter(function (c) {
+      return c.name && n.indexOf(normText(c.name)) !== -1;
+    }).map(function (c) { return Number(c.id); });
+    var firstChar = '';
+    if (charIds.length) {
+      chars.forEach(function (c) { if (Number(c.id) === charIds[0]) firstChar = c.name; });
+    }
+
+    // 名称：角色 + 类型 → 角色 → 类型 → 原文前 20 字
+    var name = '';
+    if (firstChar && type) name = firstChar + ' ' + type;
+    else if (firstChar) name = firstChar;
+    else if (type) name = type;
+    else name = t.slice(0, 20);
 
     return { name: name, ip: ip, type: type, charIds: charIds };
   }
+
+  function emptyItem(imageUrl) {
+    return { image: imageUrl, ocrText: '', name: '', ip: '', type: '', charIds: [], qty: 1, status: 'on_hand' };
+  }
+
+  function finalizeItem(cut, text) {
+    var sug = suggestItem(text);
+    return {
+      image: cut.url, ocrText: text,
+      name: sug.name, ip: sug.ip, type: sug.type, charIds: sug.charIds,
+      qty: 1, status: 'on_hand'
+    };
+  }
+
+  // ---- 生成草稿 ----
 
   function generate() {
     if (!view || !view.img) { UI.toast('请先选择照片', 'error'); return; }
     if (!view.boxes.length) { UI.toast('请先框选至少一个谷子区域', 'error'); return; }
     if (view.boxes.length > MAX_BOXES) { UI.toast('最多 ' + MAX_BOXES + ' 个区域', 'error'); return; }
+    if (view.busy) return;
+    view.busy = true;
+    setBusy(true);
 
-    var items = [];
+    var boxes = view.boxes.slice();
+    var items = new Array(boxes.length);
     var chain = Promise.resolve();
-    view.boxes.forEach(function (box, i) {
+
+    boxes.forEach(function (box, i) {
       chain = chain.then(function () {
-        var img = cropBox(view.img, box, 800);
-        if (view.useOcr) {
-          return loadOcr().then(function (worker) {
-            UI.toast('正在识别第 ' + (i + 1) + ' / ' + view.boxes.length + ' 个区域…');
-            return worker.recognize(img).then(function (res) {
-              var text = cleanText(res && res.data && res.data.text);
-              var sug = suggestItem(text);
-              items.push({ image: img, ocrText: text, name: sug.name, ip: sug.ip, type: sug.type, charIds: sug.charIds, qty: 1 });
-            });
-          }).catch(function (err) {
-            console.error('[EATG] OCR 失败', err);
-            items.push({ image: img, ocrText: '', name: '', ip: '', type: '', charIds: [], qty: 1 });
-            UI.toast('OCR 不可用（' + (err && err.message || err) + '），已按手动框选生成', 'error');
+        var cut = cropBox(view.img, box, CROP_MAX_EDGE);
+        if (!view.useOcr) { items[i] = emptyItem(cut.url); return null; }
+        if (box.text != null && box.text !== '') { items[i] = finalizeItem(cut, box.text); return null; }
+        return loadOcr().then(function (worker) {
+          setProgress('识别第 ' + (i + 1) + '/' + boxes.length + ' 个区域…', 0.3 + 0.7 * (i / boxes.length));
+          return worker.recognize(cut.url).then(function (res) {
+            var text = cleanText(res && res.data && res.data.text);
+            items[i] = finalizeItem(cut, text);
           });
-        }
-        items.push({ image: img, ocrText: '', name: '', ip: '', type: '', charIds: [], qty: 1 });
-        return null;
+        }).catch(function (err) {
+          console.error('[EATG] 第 ' + (i + 1) + ' 个区域 OCR 失败', err);
+          items[i] = emptyItem(cut.url);
+          UI.toast('第 ' + (i + 1) + ' 个区域 OCR 失败，已保留图片', 'error');
+        });
       });
     });
 
@@ -412,6 +578,7 @@
         global.localStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), items: items }));
       } catch (e) {
         UI.toast('草稿保存失败（图片过多？），请减少框选数量', 'error');
+        view.busy = false; setBusy(false); setProgress(null);
         return;
       }
       close();
@@ -425,6 +592,7 @@
   function close() {
     if (!view) return;
     view.destroyed = true;
+    terminateOcr();
     unbindCanvas();
     if (view.el && view.el.parentNode) view.el.parentNode.removeChild(view.el);
     view = null;
@@ -435,15 +603,13 @@
     var el = openOverlay();
     view = {
       el: el, canvas: el.querySelector('.bs-canvas'), boxes: [], sel: -1,
-      img: null, fit: null, destroyed: false, characters: [], ipWords: IP_WORDS.slice(),
-      useOcr: true, _handlers: null
+      img: null, fit: null, destroyed: false, busy: false,
+      characters: [], enums: { ip: [], goods_type: [] },
+      detector: null, useOcr: true, _handlers: null
     };
-    var ctx = view.canvas.getContext('2d');
-    view.ctx = ctx;
+    view.ctx = view.canvas.getContext('2d');
 
-    // 不自动弹选择层（避免跨层遮挡）；由用户点「相册 / 拍照」在弹层内弹出选项
-
-    // 载入词表（角色/IP 枚举，用于预填匹配）
+    // 载入词表（角色 + IP/类型枚举，用于预填匹配）
     S.getAll('characters').then(function (chars) {
       if (!view || view.destroyed) return;
       view.characters = chars || [];
@@ -451,11 +617,8 @@
     }).then(function (rows) {
       if (!view || view.destroyed) return;
       (rows || []).forEach(function (row) {
-        if (row.key === 'ip') {
-          (row.values || []).forEach(function (v) {
-            if (view.ipWords.indexOf(v) === -1) view.ipWords.push(v);
-          });
-        }
+        if (row.key === 'ip') view.enums.ip = row.values || [];
+        else if (row.key === 'goods_type') view.enums.goods_type = row.values || [];
       });
     }).catch(function (err) { console.error('[EATG] 词表加载失败', err); });
 
@@ -479,15 +642,19 @@
       else if (b.dataset.act === 'gen') generate();
     });
 
-    // 空态点击画布 → 添加默认框（方便快速开始）
+    // 双击画面 → 手动添加一个默认框
     view.canvas.addEventListener('dblclick', function (e) {
-      if (!view || !view.img || view.boxes.length >= MAX_BOXES) return;
+      if (!view || !view.img || view.busy || view.boxes.length >= MAX_BOXES) return;
       var p = evPos(e);
-      view.boxes.push({ x: Math.max(0, p.x - 0.15), y: Math.max(0, p.y - 0.2), w: 0.3, h: 0.4 });
+      view.boxes.push({ x: Math.max(0, p.x - 0.15), y: Math.max(0, p.y - 0.2), w: 0.3, h: 0.4, text: null });
       view.sel = view.boxes.length - 1;
       draw();
     });
   };
+
+  /** 扩展点：接入自训练物体检测模型后调用（x/y/w/h 为 0~1 归一化坐标，返回 Promise） */
+  BS.setDetector = function (fn) { if (view) view.detector = fn; BS._detector = fn; };
+  BS._detector = null;
 
   BS.hasDraft = function () {
     try { return !!global.localStorage.getItem(DRAFT_KEY); } catch (e) { return false; }

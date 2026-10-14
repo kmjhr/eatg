@@ -1752,6 +1752,11 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .bs-empty-sub{font-size:12px}
 .bs-foot{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0)}
 .bs-foot .btn{flex:1;height:42px;font-size:13px;padding:0 8px;white-space:nowrap}
+.bs-progress{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card,#fff);border-bottom:1px solid var(--line,#E6E9F0);font-size:12px;color:var(--ink-2,#5B6478)}
+.bs-progress[hidden]{display:none}
+.bs-progress-text{flex:0 0 auto;white-space:nowrap}
+.bs-progress-bar{flex:1;height:5px;border-radius:3px;background:var(--fill,#EEF1F7);overflow:hidden}
+.bs-progress-bar i{display:block;height:100%;width:0;background:var(--primary,#3D6DF5);transition:width .2s ease}
 /* 弹层内弹出的选图选项行（位于底部按钮上方，不依赖全局抽屉层级） */
 .bs-pick-options{position:absolute;left:0;right:0;bottom:66px;z-index:5;background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0);box-shadow:0 -4px 12px rgba(0,0,0,.08);display:none}
 .bs-pick-options .opt-row:last-child{border-bottom:none}

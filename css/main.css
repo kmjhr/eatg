@@ -1126,6 +1126,8 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
 .tl-body { flex: 1 1 auto; min-width: 0; }
 .tl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .tl-tags { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
+.lock-btn { flex: 0 0 auto; border: 1px solid transparent; background: none; color: var(--ink-3, #8A8A93); font-size: 12px; line-height: 1; padding: 3px 5px; margin-left: 4px; border-radius: 6px; cursor: pointer; }
+.lock-btn.is-on { color: #B8860B; border-color: rgba(184,134,11,.4); background: rgba(184,134,11,.1); }
 .tl-tags .tl-bag, .tl-tags .tl-loc { margin-left: 0; }
 .tl-date { font-size: 13px; font-weight: 600; }
 .tl-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; }

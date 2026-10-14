@@ -79,6 +79,7 @@
       characterIds: [],
       images: [],
       tags: [],
+      locks: {}, // 字段锁定：连续录入保存后保留该字段值
       quickWords: {},
       customQuickWords: {},
       goods: {},
@@ -211,10 +212,54 @@
       '<span class="unit" data-unit="' + id + '">' + UI.esc(unit) + '</span></div>';
   }
 
+  /** 字段锁定：连续录入开启时，锁定的字段保存后不清空，方便批量录入同参数字段 */
+  var LOCK_LABELS = {
+    'name': '名称', 'ip': 'IP', 'goods_type': '类型', 'chars': '角色', 'mprice': '市场参考价',
+    'note': '备注', 'tags': '标签', 'buy_date': '购入日期', 'quantity': '数量', 'unit_price': '本体单价',
+    'shipping_share': '邮费分摊', 'channel': '渠道', 'status': '状态', 'pnote': '购入备注', 'bag': '原袋', 'loc': '位置'
+  };
+  function lockBtn(key) {
+    return '<button type="button" class="lock-btn' + (state.locks[key] ? ' is-on' : '') + '" data-lock="' + key + '" title="连续录入时保留此字段">' +
+      (state.locks[key] ? '🔒' : '🔓') + '</button>';
+  }
+  function toggleLock(key) {
+    state.locks[key] = !state.locks[key];
+    var btn = dom.page && dom.page.querySelector('[data-lock="' + key + '"]');
+    if (btn) { btn.classList.toggle('is-on', state.locks[key]); btn.textContent = state.locks[key] ? '🔒' : '🔓'; }
+    UI.toast(state.locks[key]
+      ? '已锁定「' + (LOCK_LABELS[key] || key) + '」：连续录入保存后保留'
+      : '已解锁「' + (LOCK_LABELS[key] || key) + '」：保存后清空', 'success');
+  }
+  /** 收集当前被锁定字段的值（供保存后恢复） */
+  function pickLocks() {
+    var keep = {};
+    var map = {
+      'name': function () { return state.goods.name; },
+      'ip': function () { return state.goods.ip; },
+      'goods_type': function () { return state.goods.goods_type; },
+      'chars': function () { return state.characterIds.slice(); },
+      'mprice': function () { return state.goods.mprice; },
+      'note': function () { return state.goods.note; },
+      'tags': function () { return state.tags.slice(); },
+      'buy_date': function () { return state.purchase.buy_date; },
+      'quantity': function () { return state.purchase.quantity; },
+      'unit_price': function () { return state.purchase.unit_price; },
+      'shipping_share': function () { return state.purchase.shipping_share; },
+      'channel': function () { return state.purchase.channel; },
+      'status': function () { return state.status; },
+      'pnote': function () { return state.purchase.note; },
+      'bag': function () { return state.bag; },
+      'loc': function () { return state.loc; }
+    };
+    Object.keys(state.locks || {}).forEach(function (k) {
+      if (state.locks[k] && map[k]) { try { keep[k] = map[k](); } catch (e) {} }
+    });
+    return keep;
+  }
   function fieldHTML(o) {
     return '<div class="field">' +
       '<div class="field-head"><label class="field-label" for="' + o.id + '">' + UI.esc(o.label) +
-        (o.req ? ' <span class="req">*</span>' : '') + '</label>' + (o.qw ? qwBtn(o.qw) : '') + '</div>' +
+        (o.req ? ' <span class="req">*</span>' : '') + '</label>' + (o.qw ? qwBtn(o.qw) : '') + (o.lock ? lockBtn(o.lock) : '') + '</div>' +
       o.control +
       (o.hint ? '<p class="hint">' + o.hint + '</p>' : '') +
       '<p class="field-error" data-for="' + o.id + '"></p>' +
@@ -240,18 +285,18 @@
       '<div class="form-section">' +
         '<h2 class="section-title">谷子款</h2>' +
 
-        fieldHTML({ id: 'g-name', label: '名称', req: true, qw: 'name',
+        fieldHTML({ id: 'g-name', label: '名称', req: true, qw: 'name', lock: 'name',
           control: '<input id="g-name" class="input" type="text" autocomplete="off" placeholder="如：长崎素世 1st 吧唧">' }) +
 
-        fieldHTML({ id: 'g-ip', label: 'IP', req: true, qw: 'ip',
+        fieldHTML({ id: 'g-ip', label: 'IP', req: true, qw: 'ip', lock: 'ip',
           control: '<div class="input-row">' + selectHTML('g-ip', enums.ip, state.goods.ip, '请选择 IP') +
             '<button type="button" class="add-btn" data-add="ip">＋ 新增</button></div>' }) +
 
-        fieldHTML({ id: 'g-chars', label: '角色（多选）',
+        fieldHTML({ id: 'g-chars', label: '角色（多选）', lock: 'chars',
           control: '<div class="chip-select" id="g-chars"></div>' +
             '<button type="button" class="add-btn add-btn--block" data-add="char">＋ 新增角色</button>' }) +
 
-        fieldHTML({ id: 'g-type', label: '类型', req: true, qw: 'goods_type',
+        fieldHTML({ id: 'g-type', label: '类型', req: true, qw: 'goods_type', lock: 'goods_type',
           control: '<div class="input-row">' + selectHTML('g-type', enums.goods_type, state.goods.goods_type, '请选择类型') +
             '<button type="button" class="add-btn" data-add="goods_type">＋ 新增</button></div>' }) +
 
@@ -261,18 +306,18 @@
           '<p class="hint">拍照或从相册选择，最多 ' + MAX_IMAGES + ' 张；压缩后存本机（剥离 EXIF），不上传。</p>' +
         '</div>' +
 
-        fieldHTML({ id: 'g-mprice', label: '市场参考价', qw: null,
+        fieldHTML({ id: 'g-mprice', label: '市场参考价', qw: null, lock: 'mprice',
           control: moneyHTML('g-mprice', '元'),
           hint: '最近市场挂价/成交参考，可留空。' }) +
 
         '<div class="field">' +
-          '<div class="field-head"><span class="field-label">标签</span>' + qwBtn('tags') + '</div>' +
+          '<div class="field-head"><span class="field-label">标签</span>' + qwBtn('tags') + lockBtn('tags') + '</div>' +
           '<div class="tags-wrap" id="g-tags"></div>' +
           '<div class="input-row"><input id="g-tag-input" class="input" type="text" autocomplete="off" placeholder="输入标签后回车/点添加">' +
             '<button type="button" class="add-btn" data-act="tag-add">添加</button></div>' +
         '</div>' +
 
-        fieldHTML({ id: 'g-note', label: '备注', qw: 'note',
+        fieldHTML({ id: 'g-note', label: '备注', qw: 'note', lock: 'note',
           control: '<textarea id="g-note" class="textarea" placeholder="自由备注（如购入心情、品相说明）"></textarea>' }) +
 
       '</div>' +
@@ -280,30 +325,30 @@
       '<div class="form-section">' +
         '<h2 class="section-title">购入记录</h2>' +
 
-        fieldHTML({ id: 'p-date', label: '购入日期',
+        fieldHTML({ id: 'p-date', label: '购入日期', lock: 'buy_date',
           control: '<input id="p-date" class="input" type="date">' }) +
 
-        fieldHTML({ id: 'p-qty', label: '数量', req: true,
+        fieldHTML({ id: 'p-qty', label: '数量', req: true, lock: 'quantity',
           control: '<input id="p-qty" class="input" type="number" min="1" step="1" inputmode="numeric" placeholder="1">' }) +
 
-        fieldHTML({ id: 'p-unit-price', label: '本体单价（可空）', qw: 'unit_price',
+        fieldHTML({ id: 'p-unit-price', label: '本体单价（可空）', qw: 'unit_price', lock: 'unit_price',
           control: moneyHTML('p-unit-price', unit),
           hint: '留空则价格状态自动为「未知」，成本未知暂不计盈利。' }) +
 
         fieldHTML({ id: 'p-currency', label: '币种',
           control: selectHTML('p-currency', CURRENCIES, state.currency, '请选择币种') }) +
 
-        fieldHTML({ id: 'p-ship', label: '邮费分摊', qw: 'shipping_share',
+        fieldHTML({ id: 'p-ship', label: '邮费分摊', qw: 'shipping_share', lock: 'shipping_share',
           control: moneyHTML('p-ship', unit),
           hint: state.from === 'order'
             ? '从订单进入：邮费分摊只读（如需调整请回订单页统一分摊）。'
             : '本件承担的邮费份额；未分摊填 0。整单分摊模式在订单页统一设置。' }) +
 
-        fieldHTML({ id: 'p-channel', label: '渠道', qw: 'channel',
+        fieldHTML({ id: 'p-channel', label: '渠道', qw: 'channel', lock: 'channel',
           control: '<div class="input-row">' + selectHTML('p-channel', enums.channel, state.purchase.channel, '请选择渠道') +
             '<button type="button" class="add-btn" data-add="channel">＋ 新增</button></div>' }) +
 
-        fieldHTML({ id: 'p-status', label: '状态', req: true,
+        fieldHTML({ id: 'p-status', label: '状态', req: true, lock: 'status',
           control: selectHTML('p-status', A.STATUS_ORDER, state.status, '请选择状态', A.STATUS_LABELS) }) +
 
         '<div class="field">' +
@@ -316,11 +361,11 @@
           '<p class="hint" id="p-ps-hint"></p>' +
         '</div>' +
 
-        fieldHTML({ id: 'p-note', label: '购入备注', qw: 'pnote',
+        fieldHTML({ id: 'p-note', label: '购入备注', qw: 'pnote', lock: 'pnote',
           control: '<textarea id="p-note" class="textarea" placeholder="如：合单分摊、补款说明"></textarea>' }) +
 
         '<div class="field">' +
-          '<div class="field-head"><span class="field-label">原袋</span></div>' +
+          '<div class="field-head"><span class="field-label">原袋</span>' + lockBtn('bag') + '</div>' +
           '<div class="chip-select" id="p-bag">' +
             '<button type="button" class="opt-chip" data-bag="">未标记</button>' +
             '<button type="button" class="opt-chip" data-bag="1">有原袋</button>' +
@@ -329,7 +374,7 @@
           '<p class="hint">该件购入是否带原包装袋。</p>' +
         '</div>' +
         '<div class="field">' +
-          '<div class="field-head"><span class="field-label">位置</span></div>' +
+          '<div class="field-head"><span class="field-label">位置</span>' + lockBtn('loc') + '</div>' +
           '<div class="chip-select" id="p-loc">' +
             '<button type="button" class="opt-chip" data-loc="">未标记</button>' +
             '<button type="button" class="opt-chip" data-loc="home">在家</button>' +
@@ -580,6 +625,9 @@
 
       var qw = e.target.closest('[data-qw]');
       if (qw) { openQuickSheet(qw.dataset.qw); return; }
+
+      var lock = e.target.closest('[data-lock]');
+      if (lock) { toggleLock(lock.dataset.lock); return; }
 
       var act = e.target.closest('[data-act]');
       if (!act) return;
@@ -1054,20 +1102,34 @@
     });
   }
 
-  /** 连续录入：保存成功后清空表单，留在录入页继续填下一项（新增模式） */
+  /** 连续录入：保存成功后清空表单，留在录入页继续填下一项（新增模式）；锁定字段保留 */
   function resetForm() {
+    var keep = pickLocks(); // 先收集锁定字段的值
     state.goodsId = null;
     state.purchaseId = null;
     state.orderId = null;
     state.priceManual = false;
-    state.bag = null;
-    state.loc = null;
-    state.characterIds = [];
     state.images = [];
-    state.tags = [];
     state.goods = {};
     state.purchase = {};
     applyQueryPrefill(new URLSearchParams('')); // 空参数 → 默认（购入日期=今天、数量 1 等）
+    // 恢复锁定字段（覆盖默认值）
+    if (keep.name !== undefined) state.goods.name = keep.name;
+    if (keep.ip !== undefined) state.goods.ip = keep.ip;
+    if (keep.goods_type !== undefined) state.goods.goods_type = keep.goods_type;
+    if (keep.mprice !== undefined) state.goods.mprice = keep.mprice;
+    if (keep.note !== undefined) state.goods.note = keep.note;
+    if (keep.tags !== undefined) state.tags = keep.tags;
+    state.characterIds = keep.chars !== undefined ? keep.chars : [];
+    state.bag = keep.bag !== undefined ? keep.bag : null;
+    state.loc = keep.loc !== undefined ? keep.loc : null;
+    if (keep.buy_date !== undefined) state.purchase.buy_date = keep.buy_date;
+    if (keep.quantity !== undefined) state.purchase.quantity = keep.quantity;
+    if (keep.unit_price !== undefined) state.purchase.unit_price = keep.unit_price;
+    if (keep.shipping_share !== undefined) state.purchase.shipping_share = keep.shipping_share;
+    if (keep.channel !== undefined) state.purchase.channel = keep.channel;
+    if (keep.pnote !== undefined) state.purchase.note = keep.pnote;
+    if (keep.status !== undefined) state.status = keep.status;
     clearOffs();
     dom.container.innerHTML = sectionHTML();
     cacheDom();

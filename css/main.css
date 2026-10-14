@@ -1851,3 +1851,7 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .tl-loc.is-sch{border-color:#4A7DFF;color:#2F6BDF;background:rgba(74,125,255,.08)}
 .tl-loc.is-oth{border-color:#E8A33D;color:#C47F17;background:rgba(232,163,61,.08)}
 .tl-loc:active{opacity:.6}
+/* 图鉴品类管理 */
+.cat-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.cat-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-sel{flex:0 0 96px;height:32px;font-size:13px}

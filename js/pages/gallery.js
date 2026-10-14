@@ -26,6 +26,17 @@
     on_hand: '现货在手', sold_out: '已出荷'
   };
 
+  // 图鉴五大品类（固定顺序）+ 默认类型→品类映射（可在「品类管理」中调整）
+  var CATS = ['吧唧', '纸片', '立牌', '毛绒', '其他'];
+  var DEFAULT_TYPE_CAT = {
+    '徽章（吧唧）': '吧唧', '徽章': '吧唧', '吧唧': '吧唧', '亚克力徽章': '吧唧',
+    '罐徽章': '吧唧', '马口铁徽章': '吧唧', '金属徽章': '吧唧',
+    '色纸': '纸片', '拍立得': '纸片', '生写': '纸片', '卡片': '纸片', '卡牌': '纸片',
+    '明信片': '纸片', '贴纸': '纸片', '票根': '纸片',
+    '立牌': '立牌', '亚克力立牌': '立牌', '面板亚克力立牌': '立牌', '迷你亚克力立牌': '立牌',
+    '毛绒': '毛绒', '娃娃': '毛绒', 'ぬいぐるみ': '毛绒', '毛绒挂件': '毛绒', '毛绒玩偶': '毛绒'
+  };
+
   var state = null;
   var dom = {};
   var offs = [];
@@ -53,6 +64,7 @@
       search: '',
       groupMode: 'flat', // 分组模式：flat 平铺 / series 按系列 / type 按品类
       sortMode: false,   // 排序模式：长按卡片拖动重新排列（仅平铺视图）
+      typeCatMap: {},    // 类型→品类映射（默认 + 用户设置合并）
       swipeMode: false,
       autoOwn: false // 常规图鉴「点亮模式」开关：默认关闭防误触（打开后点击卡片点亮拥有）
     };
@@ -108,6 +120,14 @@
         var fav = state.characters.filter(function (c) { return c.is_favorite; })[0];
         state.currentCharId = (fav || state.characters[0] || {}).id || null;
       }
+      // 类型→品类映射：默认 + 用户设置覆盖
+      return S.getSetting('gallery_type_cat_map').then(function (m) {
+        state.typeCatMap = {};
+        for (var k in DEFAULT_TYPE_CAT) state.typeCatMap[k] = DEFAULT_TYPE_CAT[k];
+        if (m && typeof m === 'object') {
+          for (var k2 in m) state.typeCatMap[k2] = m[k2];
+        }
+      });
     });
   }
 
@@ -510,15 +530,22 @@
     return order.map(function (k) { return { series: k, items: map[k] }; });
   }
 
-  /** 按品类分组（goods_type）：吧唧/立牌/挂件/纸片/娃娃…；无品类归「未分类」，组内保持手动排序 */
+  /** 条目 → 五大品类；无映射/未知类型默认归「其他」 */
+  function catOf(it) {
+    var t = String(it.goods_type || '').trim();
+    if (t && state.typeCatMap[t]) return state.typeCatMap[t];
+    return '其他';
+  }
+
+  /** 按品类分组（固定顺序：吧唧 → 纸片 → 立牌 → 毛绒 → 其他），组内保持手动排序 */
   function groupByTypeItems(items) {
-    var map = {}, order = [];
+    var map = {};
     items.forEach(function (it) {
-      var key = it.goods_type || '未分类';
-      if (!map[key]) { map[key] = []; order.push(key); }
-      map[key].push(it);
+      var key = catOf(it);
+      (map[key] = map[key] || []).push(it);
     });
-    return order.map(function (k) { return { series: k, items: map[k] }; });
+    return CATS.filter(function (c) { return map[c] && map[c].length; })
+      .map(function (c) { return { series: c, items: map[c] }; });
   }
 
   function gridHTML() {
@@ -699,6 +726,7 @@
       '<input id="gal-search" class="input" type="text" placeholder="搜索条目名称" value="' + esc(state.search) + '">' +
       '<div class="gal-toolbar-row">' +
         '<button type="button" class="btn btn--secondary" id="gal-group-btn">' + GROUP_LABEL[state.groupMode] + '</button>' +
+        (state.groupMode === 'type' ? '<button type="button" class="btn btn--secondary" id="gal-cat-btn" title="管理品类映射">品类</button>' : '') +
         '<button type="button" class="btn btn--secondary" id="gal-sort-btn" title="长按卡片拖动重新排列">排序</button>' +
         '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
       '</div>' +
@@ -800,6 +828,48 @@
     });
   }
 
+  // ---- 品类管理：把谷子类型归入五大品类 ----
+  function openCatManage() {
+    var seen = {};
+    var types = [];
+    state.items.forEach(function (it) {
+      var t = String(it.goods_type || '').trim();
+      if (t && !seen[t]) { seen[t] = true; types.push(t); }
+    });
+    for (var k in DEFAULT_TYPE_CAT) {
+      if (!seen[k]) { seen[k] = true; types.push(k); }
+    }
+    types.sort();
+    var catOpts = CATS.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    var body = '<div class="form-section"><p class="gal-swipe-opt-tip" style="margin-bottom:6px">把谷子类型归入五大品类（图鉴按品类分组时生效）；未列出的类型默认归「其他」。</p>';
+    types.forEach(function (t) {
+      var cur = state.typeCatMap[t] || '其他';
+      body += '<div class="cat-row"><span class="cat-name">' + esc(t) + '</span>' +
+        '<select class="input cat-sel" data-type="' + esc(t) + '">' +
+        CATS.map(function (c) { return '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
+        '</select></div>';
+    });
+    body += '</div>';
+    var ref = UI.sheet({ title: '图鉴品类管理', bodyHTML: body, footerHTML: '<button type="button" class="btn btn--primary" data-act="save">保存</button>' });
+    ref.el.addEventListener('click', function (e) {
+      if (e.target.dataset.act !== 'save') return;
+      var map = {};
+      var sels = ref.el.querySelectorAll('.cat-sel');
+      for (var i = 0; i < sels.length; i++) map[sels[i].dataset.type] = sels[i].value;
+      S.setSetting('gallery_type_cat_map', map).then(function () {
+        state.typeCatMap = {};
+        for (var k2 in DEFAULT_TYPE_CAT) state.typeCatMap[k2] = DEFAULT_TYPE_CAT[k2];
+        for (var k3 in map) state.typeCatMap[k3] = map[k3];
+        UI.toast('品类映射已保存', 'success');
+        ref.close();
+        rerender();
+      }).catch(function (err) {
+        console.error('[EATG] 品类映射保存失败', err);
+        UI.toast('保存失败', 'error');
+      });
+    });
+  }
+
   // ---- 添加角色 ----
   function openAddChar() {
     var body = '<div class="form-section">' +
@@ -892,6 +962,8 @@
     if (search) pon(search, 'input', function () { state.search = search.value; rerender(); });
     var gb = document.getElementById('gal-group-btn');
     if (gb) pon(gb, 'click', function () { state.groupMode = GROUP_NEXT[state.groupMode]; rerender(); });
+    var catBtn = document.getElementById('gal-cat-btn');
+    if (catBtn) pon(catBtn, 'click', function () { openCatManage(); });
     var sortBtn = document.getElementById('gal-sort-btn');
     if (sortBtn) pon(sortBtn, 'click', function () {
       if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }

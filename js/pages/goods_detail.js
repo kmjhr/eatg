@@ -272,8 +272,8 @@
     }
     var items = list.map(function (p) {
       var ps = p.price_status || 'unknown';
-      var priceTag = ps === 'estimated' ? '<span class="tag tag--est">估算</span>'
-        : (ps === 'unknown' ? '<span class="tag tag--unknown">价格未知</span>' : '');
+      // 估算/未知提示下方行已有「价格状态：xx」，标签行不再重复显示「估算」
+      var priceTag = ps === 'unknown' ? '<span class="tag tag--unknown">价格未知</span>' : '';
       var unit = p.unit_price == null ? '<span class="muted">单价未知</span>' : '<span class="num">' + money(p.unit_price, p.currency) + '</span>';
       var ship = num(p.shipping_share) ? '<span class="muted">邮费 ' + money(p.shipping_share, p.currency) + '</span>' : '<span class="muted">未分摊邮费</span>';
       var qty = '×' + num(p.quantity) + (num(p.sold_quantity) ? '（已卖 ' + num(p.sold_quantity) + '）' : '');
@@ -282,7 +282,8 @@
         '<div class="tl-body">' +
           '<div class="tl-head">' +
             '<span class="tl-date num">' + UI.esc(p.buy_date || '—') + '</span>' +
-            '<span class="tl-tags">' + badgeHTML(p.status) + priceTag + bagBtnHTML(p) + locBtnHTML(p) + '</span>' +
+            '<span class="tl-tags">' + badgeHTML(p.status) + priceTag +
+              '<span class="tl-bagloc">' + bagBtnHTML(p) + locBtnHTML(p) + '</span></span>' +
           '</div>' +
           '<div class="tl-row"><span class="tl-qty num">' + qty + '</span>' + unit + ship + '</div>' +
           '<div class="tl-row muted"><span>渠道：' + UI.esc(p.channel || '—') + '</span>' +

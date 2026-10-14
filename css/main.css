@@ -1614,21 +1614,21 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-toolbar .input{flex:1}
 .gal-grid{padding:0 12px 24px}
 .gal-group{margin-bottom:14px}
-.gal-group-title{font-size:13px;font-weight:600;color:var(--ink,#333);margin:8px 0 6px;padding-left:2px}
-.gal-grid-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.gal-card{background:var(--card,#fff);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer}
+.gal-group-title{font-size:12px;font-weight:600;color:var(--ink,#333);margin:6px 0 4px;padding-left:2px}
+.gal-grid-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.gal-card{background:var(--card,#fff);border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer}
 .gal-card-img{width:100%;aspect-ratio:1/1;background-size:cover;background-position:center;background-color:var(--fill,#eee);position:relative;transition:filter .3s ease,opacity .3s ease}
 .gal-card--owned .gal-card-img{filter:none}
 .gal-card--half .gal-card-img{opacity:.7;filter:none}
 .gal-card--none .gal-card-img{filter:grayscale(1);opacity:.45}
 .gal-card--none .gal-card-name{color:var(--ink-3,#8E8E8E)}
-.gal-badge{position:absolute;top:6px;left:6px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;color:#222}
+.gal-badge{position:absolute;top:4px;left:4px;padding:1px 5px;border-radius:999px;font-size:9px;font-weight:700;color:#222}
 .gal-badge--owned{background:var(--accent,#FFDD88)}
 .gal-badge--deposit_pre{background:var(--warn,#E67E22);color:#fff}
 .gal-badge--full_pre{background:var(--info,#2E86C1);color:#fff}
 .gal-badge--shipping{background:var(--shipping,#8E44AD);color:#fff}
-.gal-card-name{font-size:13px;font-weight:600;padding:8px 10px 2px;line-height:1.3}
-.gal-card-series{font-size:11px;color:var(--muted,#888);padding:0 10px 8px}
+.gal-card-name{font-size:11.5px;font-weight:600;padding:5px 6px 1px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gal-card-series{font-size:10px;color:var(--muted,#888);padding:0 6px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gal-detail{text-align:center;padding:8px 0 12px}
 .gal-detail-img{width:120px;height:120px;object-fit:cover;border-radius:12px;margin:0 auto 12px}
 .gal-detail-img--ph{display:flex;align-items:center;justify-content:center;background:var(--fill,#f0f0f0);color:var(--ink-3,#888)}

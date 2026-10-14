@@ -31,7 +31,8 @@
       itemId: null,
       item: { character_id: null, name: '', series: '', release_date: '', image: '', owned: false, goods_id: null },
       characters: [],
-      goods: []
+      goods: [],
+      galleryCats: []
     };
   }
 
@@ -39,9 +40,10 @@
     var params = new URLSearchParams(ctx.query);
     var id = params.get('id');
     var cid = params.get('character_id');
-    return Promise.all([S.getAll('characters'), S.getAll('goods')]).then(function (r) {
+    return Promise.all([S.getAll('characters'), S.getAll('goods'), S.getSetting('galleryCats')]).then(function (r) {
       state.characters = r[0] || [];
       state.goods = r[1] || [];
+      state.galleryCats = (Array.isArray(r[2]) && r[2].length) ? r[2] : EATG.DEFAULT_GALLERY_CATS.slice();
       if (id) {
         state.mode = 'edit';
         state.itemId = Number(id);
@@ -74,9 +76,10 @@
 
   function catOpts() {
     var cur = String(state.item.category || '');
-    var list = [['', '未填写（归入其他）'], ['吧唧', '吧唧'], ['纸片', '纸片'], ['立牌', '立牌'], ['毛绒', '毛绒'], ['其他', '其他']];
-    return list.map(function (pair) {
-      return '<option value="' + pair[0] + '"' + (cur === pair[0] ? ' selected' : '') + '>' + pair[1] + '</option>';
+    var cats = state.galleryCats.length ? state.galleryCats : EATG.DEFAULT_GALLERY_CATS;
+    var list = [''].concat(cats);
+    return list.map(function (c) {
+      return '<option value="' + c + '"' + (cur === c ? ' selected' : '') + '>' + (c || '未填写（归入「其他」）') + '</option>';
     }).join('');
   }
 

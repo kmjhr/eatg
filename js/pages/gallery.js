@@ -26,8 +26,9 @@
     on_hand: '现货在手', sold_out: '已出荷'
   };
 
-  // 图鉴五大品类（固定顺序；条目显式填写 category，未填写视为「其他」）
-  var CATS = ['吧唧', '纸片', '立牌', '毛绒', '其他'];
+  // 图鉴品类选项：来自数据管理「品类选项」（可增删改，settings.galleryCats）；
+  // 默认五大类（吧唧/纸片/立牌/毛绒/其他）。条目显式填写 category，未填写或已删除的品类归兜底「其他」。
+  var DEFAULT_GALLERY_CATS = EATG.DEFAULT_GALLERY_CATS;
 
   var state = null;
   var dom = {};
@@ -57,6 +58,7 @@
       groupMode: 'flat', // 分组模式：flat 平铺 / type 按品类
       sortMode: false,   // 排序模式：长按卡片拖动重新排列（仅平铺视图）
       filterCats: [],    // 品类筛选（多选）：空数组=全部，可同时选多个品类
+      galleryCats: [],   // 品类选项（来自数据管理，可增删改）
       swipeMode: false,
       autoOwn: false // 常规图鉴「点亮模式」开关：默认关闭防误触（打开后点击卡片点亮拥有）
     };
@@ -96,7 +98,8 @@
       S.getAll('characters'),
       S.getAll('gallery_items'),
       S.getAll('goods'),
-      S.getAll('purchase_items')
+      S.getAll('purchase_items'),
+      S.getSetting('galleryCats')
     ]).then(function (r) {
       // 图鉴角色独立：只显示 gallery!==false 的角色（谷子侧新增角色不进图鉴）
       state.characters = (r[0] || []).filter(function (c) { return c.gallery !== false; });
@@ -107,6 +110,7 @@
       (r[3] || []).forEach(function (p) {
         (state.purchasesByGoods[p.goods_id] = state.purchasesByGoods[p.goods_id] || []).push(p);
       });
+      state.galleryCats = (Array.isArray(r[4]) && r[4].length) ? r[4] : DEFAULT_GALLERY_CATS.slice();
       // 默认选中：自推优先，否则第一个
       if (!state.currentCharId || !state.characters.some(function (c) { return c.id === state.currentCharId; })) {
         var fav = state.characters.filter(function (c) { return c.is_favorite; })[0];
@@ -507,20 +511,24 @@
     '</div>';
   }
 
-  /** 条目 → 五大品类（条目显式 category，未填写默认「其他」） */
+  /** 条目 → 品类：显式 category 且仍在品类选项中则用之；否则归兜底（有「其他」用「其他」，否则用列表最后一项） */
   function catOf(it) {
+    var cats = state.galleryCats.length ? state.galleryCats : DEFAULT_GALLERY_CATS;
     var c = String(it.category || '').trim();
-    return c || '其他';
+    if (c && cats.indexOf(c) >= 0) return c;
+    return cats.indexOf('其他') >= 0 ? '其他' : (cats[cats.length - 1] || '未分类');
   }
 
-  /** 按品类分组（固定顺序：吧唧 → 纸片 → 立牌 → 毛绒 → 其他），组内保持手动排序 */
+  /** 按品类分组（按品类选项顺序，组内保持手动排序） */
   function groupByTypeItems(items) {
+    var cats = state.galleryCats.length ? state.galleryCats : DEFAULT_GALLERY_CATS;
     var map = {};
     items.forEach(function (it) {
       var key = catOf(it);
       (map[key] = map[key] || []).push(it);
     });
-    return CATS.filter(function (c) { return map[c] && map[c].length; })
+    return cats.filter(function (c) { return map[c] && map[c].length; })
+      .concat(Object.keys(map).filter(function (k) { return cats.indexOf(k) < 0; }))
       .map(function (c) { return { series: c, items: map[c] }; });
   }
 
@@ -693,7 +701,7 @@
         '<button type="button" class="btn btn--secondary" id="gal-swipe-btn" title="卡片堆叠，左右刷卡浏览">刷卡</button>' +
       '</div>' +
       '<div class="gal-cat-filter">' +
-        ['', '吧唧', '纸片', '立牌', '毛绒', '其他'].map(function (c) {
+        ([''].concat(state.galleryCats.length ? state.galleryCats : DEFAULT_GALLERY_CATS)).map(function (c) {
           var on = c === '' ? state.filterCats.length === 0 : state.filterCats.indexOf(c) >= 0;
           return '<button type="button" class="gal-cat-chip' + (on ? ' is-on' : '') + '" data-cat="' + esc(c) + '">' + esc(c || '全部') + '</button>';
         }).join('') +

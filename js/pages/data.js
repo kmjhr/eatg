@@ -92,7 +92,8 @@
       S.getSetting('auto_backup_remind'),
       S.getAll('enums'),
       S.getAll('characters'),
-      S.getAll('gallery_items')
+      S.getAll('gallery_items'),
+      S.getSetting('galleryCats')
     ]).then(function (r) {
       state.last_backup_at = r[0] || null;
       state.auto_backup_remind = r[1] || S.SETTINGS_DEFAULTS.auto_backup_remind;
@@ -102,6 +103,7 @@
       state.quickWords = loadQuickWordsMerged();
       state.characters = r[3] || [];
       state.galleryItems = r[4] || [];
+      state.galleryCats = (Array.isArray(r[5]) && r[5].length) ? r[5] : EATG.DEFAULT_GALLERY_CATS.slice();
     });
   }
 
@@ -520,49 +522,109 @@
     });
   }
 
-  /** 条目品类区：给每个图鉴条目填写五大品类（未填写=其他） */
-  function catHTML() {
-    var items = state.galleryItems || [];
-    var rows = items.map(function (it, i) {
-      var cur = String(it.category || '');
-      var ch = null;
-      var chars = state.characters || [];
-      for (var j = 0; j < chars.length; j++) {
-        if (chars[j].id === it.character_id) { ch = chars[j]; break; }
-      }
-      return '<div class="cat-row"><span class="cat-name">' + esc(it.name || '(未命名)') +
-        (ch ? ' <i class="dm-chip-tag">' + esc(ch.name) + '</i>' : '') + '</span>' +
-        '<select class="input cat-sel" data-i="' + i + '">' + catOpts(cur) + '</select></div>';
+  /** 品类选项区：管理图鉴品类的选项本身（可增、可删、可编辑），默认五大类 */
+  function catMgrHTML() {
+    var cats = state.galleryCats.length ? state.galleryCats : EATG.DEFAULT_GALLERY_CATS;
+    var rows = cats.map(function (c, i) {
+      return '<div class="cat-row">' +
+        '<span class="cat-name">' + esc(c) + '</span>' +
+        '<button type="button" class="btn btn--sm" data-act="edit-cat" data-i="' + i + '">编辑</button>' +
+        '<button type="button" class="btn btn--sm btn--danger" data-act="del-cat" data-i="' + i + '">删除</button></div>';
     }).join('');
     return '<div class="dm-section">' +
-      '<div class="dm-section-title">条目品类</div>' +
-      '<p class="dm-note">给每个图鉴条目填写品类（吧唧/纸片/立牌/毛绒/其他），未填写视为「其他」；图鉴页可按品类筛选、按品类分组。</p>' +
-      '<div class="dm-group">' + (rows || '<span class="muted">暂无图鉴条目</span>') +
-        '<div class="dm-actions"><button type="button" class="btn btn--primary" data-act="save-cat">保存品类（共 ' + items.length + ' 条）</button></div>' +
+      '<div class="dm-section-title">品类选项</div>' +
+      '<p class="dm-note">图鉴条目的品类选项（默认：吧唧/纸片/立牌/毛绒/其他），可新增、编辑、删除；删除后该品类下的条目归入「其他」。未填写品类的条目显示为「其他」。</p>' +
+      '<div class="dm-group">' + (rows || '<span class="muted">暂无品类，请新增</span>') +
+        '<div class="dm-add-row"><input class="input" id="cat-add" type="text" autocomplete="off" placeholder="新增品类，如：徽章">' +
+        '<button type="button" class="btn btn--sm" data-act="add-cat">添加</button></div>' +
       '</div>' +
     '</div>';
   }
-  function catOpts(cur) {
-    var list = [['', '未填写（其他）'], ['吧唧', '吧唧'], ['纸片', '纸片'], ['立牌', '立牌'], ['毛绒', '毛绒'], ['其他', '其他']];
-    return list.map(function (pair) {
-      return '<option value="' + pair[0] + '"' + (cur === pair[0] ? ' selected' : '') + '>' + pair[1] + '</option>';
-    }).join('');
+
+  /** 读取品类选项（当前 state.galleryCats，空则默认） */
+  function currentCats() {
+    return state.galleryCats.length ? state.galleryCats : EATG.DEFAULT_GALLERY_CATS.slice();
   }
-  function saveCat() {
-    var sels = document.querySelectorAll('.cat-sel');
-    if (!sels.length) { UI.toast('暂无条目可保存', 'info'); return; }
-    var p = Promise.resolve();
-    for (var i = 0; i < sels.length; i++) {
-      (function (i) {
-        var it = state.galleryItems[i];
-        if (!it) return;
-        var v = sels[i].value;
-        it.category = v || '';
-        p = p.then(function () { return S.put('gallery_items', it); });
-      })(i);
-    }
-    p.then(function () { UI.toast('已保存 ' + sels.length + ' 条品类', 'success'); rerender(); })
-      .catch(function (err) { console.error('[EATG] 品类保存失败', err); UI.toast('保存失败', 'error'); });
+
+  function addCat() {
+    var input = document.getElementById('cat-add');
+    var v = input ? input.value.trim() : '';
+    if (!v) { UI.toast('请输入品类名称', 'error'); return; }
+    var cats = currentCats();
+    if (cats.indexOf(v) >= 0) { UI.toast('该品类已存在', 'error'); return; }
+    cats.push(v);
+    state.galleryCats = cats;
+    S.setSetting('galleryCats', cats).then(function () { UI.toast('已添加品类', 'success'); rerender(); })
+      .catch(function () { UI.toast('保存失败', 'error'); });
+  }
+
+  function editCat(i) {
+    var cats = currentCats();
+    if (i < 0 || i >= cats.length) return;
+    var old = cats[i];
+    var ref = UI.sheet({
+      title: '编辑品类',
+      bodyHTML: '<input class="input" id="cat-edit-input" autocomplete="off" value="' + esc(old) + '">',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+        '<button type="button" class="btn btn--primary" data-act="ok">保存</button>'
+    });
+    var input = ref.body.querySelector('#cat-edit-input');
+    if (input) setTimeout(function () { input.focus(); }, 0);
+    if (ref.foot) ref.foot.addEventListener('click', function (e) {
+      var act = e.target.closest('[data-act]');
+      if (!act) return;
+      if (act.getAttribute('data-act') === 'cancel') { ref.close(); return; }
+      if (act.getAttribute('data-act') === 'ok') {
+        var name = ref.body.querySelector('#cat-edit-input');
+        var v = name ? name.value.trim() : '';
+        if (!v) { UI.toast('品类名不能为空', 'error'); return; }
+        if (v === old) { ref.close(); return; }
+        var c = cats.slice();
+        if (c.indexOf(v) >= 0) { UI.toast('该品类已存在', 'error'); return; }
+        c[i] = v;
+        // 同步更新该品类下所有图鉴条目的 category（保持数据一致）
+        var items = state.galleryItems || [];
+        var updated = [];
+        items.forEach(function (it) {
+          if (String(it.category || '') === old) { it.category = v; updated.push(it); }
+        });
+        state.galleryCats = c;
+        var ops = updated.map(function (it) { return { action: 'put', store: 'gallery_items', value: it }; });
+        var chain = S.setSetting('galleryCats', c);
+        if (ops.length) chain = chain.then(function () { return S.bulk(['gallery_items'], ops); });
+        chain.then(function () { ref.close(); UI.toast('品类已改名，' + updated.length + ' 条条目已同步', 'success'); rerender(); })
+          .catch(function () { UI.toast('保存失败', 'error'); });
+      }
+    });
+  }
+
+  function delCat(i) {
+    var cats = currentCats();
+    if (i < 0 || i >= cats.length) return;
+    var name = cats[i];
+    UI.confirmDialog({
+      title: '删除品类',
+      message: '删除品类「' + name + '」？该品类下的图鉴条目将归入「其他」。',
+      confirmText: '删除',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      var c = cats.slice();
+      c.splice(i, 1);
+      if (!c.length) c = EATG.DEFAULT_GALLERY_CATS.slice();
+      // 该品类下条目 category 清空 → 显示归「其他」
+      var items = state.galleryItems || [];
+      var updated = [];
+      items.forEach(function (it) {
+        if (String(it.category || '') === name) { it.category = ''; updated.push(it); }
+      });
+      state.galleryCats = c;
+      var ops = updated.map(function (it) { return { action: 'put', store: 'gallery_items', value: it }; });
+      var chain = S.setSetting('galleryCats', c);
+      if (ops.length) chain = chain.then(function () { return S.bulk(['gallery_items'], ops); });
+      chain.then(function () { UI.toast('已删除品类，' + updated.length + ' 条条目已归入其他', 'success'); rerender(); })
+        .catch(function () { UI.toast('保存失败', 'error'); });
+    });
   }
 
   function quickHTML() {
@@ -706,7 +768,9 @@
     if (a === 'add-galchar') { addGalChar(); return; }
     if (a === 'del-galchar') { delGalChar(Number(b.dataset.i)); return; }
     if (a === 'edit-galchar') { editGalChar(Number(b.dataset.i)); return; }
-    if (a === 'save-cat') { saveCat(); return; }
+    if (a === 'add-cat') { addCat(); return; }
+    if (a === 'edit-cat') { editCat(Number(b.dataset.i)); return; }
+    if (a === 'del-cat') { delCat(Number(b.dataset.i)); return; }
   }
 
   function dimCheckboxes() {
@@ -755,7 +819,7 @@
 
       '<div class="dm-block-title">图鉴 · 图鉴管理</div>' +
       galCharsHTML() +
-      catHTML() +
+      catMgrHTML() +
 
       '<div class="dm-footer">所有数据仅存于本机浏览器，不上传服务器。</div>' +
     '</div>';

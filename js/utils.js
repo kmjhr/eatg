@@ -403,4 +403,22 @@
   }
   U.applyTheme = applyTheme;
 
+  // ---- 图鉴品类选项（可增删改，settings.galleryCats 持久化；默认五大类） ----
+  EATG.DEFAULT_GALLERY_CATS = ['吧唧', '纸片', '立牌', '毛绒', '其他'];
+
+  /** 读取品类选项列表并填充到 dst（同步返回 dst，供渲染用；读取失败/为空用默认） */
+  U.loadGalleryCats = function (dst) {
+    var st = global.EATG.storage;
+    if (!st || !st.getSetting) { return EATG.DEFAULT_GALLERY_CATS.slice(); }
+    return st.getSetting('galleryCats').then(function (arr) {
+      var list = (Array.isArray(arr) && arr.length) ? arr : EATG.DEFAULT_GALLERY_CATS.slice();
+      dst.length = 0;
+      for (var i = 0; i < list.length; i++) dst.push(list[i]);
+      return dst;
+    }).catch(function () {
+      dst.length = 0;
+      return EATG.DEFAULT_GALLERY_CATS.slice();
+    });
+  };
+
 })(window);

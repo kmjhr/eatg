@@ -282,7 +282,7 @@
         '<div class="tl-body">' +
           '<div class="tl-head">' +
             '<span class="tl-date num">' + UI.esc(p.buy_date || '—') + '</span>' +
-            badgeHTML(p.status) + priceTag + bagBtnHTML(p) + locBtnHTML(p) +
+            '<span class="tl-tags">' + badgeHTML(p.status) + priceTag + bagBtnHTML(p) + locBtnHTML(p) + '</span>' +
           '</div>' +
           '<div class="tl-row"><span class="tl-qty num">' + qty + '</span>' + unit + ship + '</div>' +
           '<div class="tl-row muted"><span>渠道：' + UI.esc(p.channel || '—') + '</span>' +

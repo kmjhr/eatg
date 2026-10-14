@@ -1125,6 +1125,8 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
 }
 .tl-body { flex: 1 1 auto; min-width: 0; }
 .tl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.tl-tags { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 4px; min-width: 0; }
+.tl-tags .tl-bag, .tl-tags .tl-loc { margin-left: 0; }
 .tl-date { font-size: 13px; font-weight: 600; }
 .tl-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 13px; }
 .tl-qty { font-weight: 600; }
@@ -1520,6 +1522,9 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .src-type--custom{background:rgba(149,165,166,.2);color:var(--ink-3)}
 
 /* --- P17 愿望清单 --- */
+.wl-tabs{display:flex;gap:8px;margin:0 0 12px}
+.wl-tab{flex:1;padding:9px 0;border:1px solid var(--line,#E6E9F0);border-radius:9px;background:var(--card,#fff);font-size:13px;color:var(--ink-2);cursor:pointer}
+.wl-tab.is-on{border-color:var(--info,#2F6FED);color:var(--info,#2F6FED);background:rgba(47,111,237,.06);font-weight:600}
 .wl-list{padding:0 var(--pad-page) var(--pad-page)}
 .wl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--line);margin-bottom:8px}
 .wl-main{min-width:0;flex:1}

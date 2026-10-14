@@ -26,7 +26,8 @@
   var state = null;
   var dom = {};
   var offs = [];
-  var chartRefs = []; // 图表引用，unmount 时清理
+  var chartRefs = [];
+  var DETAIL_LIMIT = 50; // 明细/自检列表单次渲染上限（防大数据量卡顿） // 图表引用，unmount 时清理
 
   function on(el, ev, fn, opt) { if (!el) return; el.addEventListener(ev, fn, opt); offs.push([el, ev, fn, opt]); }
   function clearOffs() { offs.forEach(function (t) { t[0].removeEventListener(t[1], t[2], t[3]); }); offs = []; }
@@ -39,6 +40,7 @@
 
   function resetState() {
     state = {
+      detailCache: null,
       destroyed: false,
       model: null,
       view: 'split',          // split=分开统计 / total=总统计
@@ -407,24 +409,43 @@
     '</div>';
   }
 
+  /** 数据自检：懒加载——点开才构建表格；每张表最多 DETAIL_LIMIT 行（防大数据量卡顿） */
   function dbgHTML(model) {
-    function gName(id) { var hit = null; (model.goods || []).forEach(function (g) { if (String(g.id) === String(id)) hit = g; }); return hit; }
-    var ps = (model.purchases || []).map(function (p) {
-      var g = gName(p.goods_id);
+    return '<details class="dbg" id="dbg-box"><summary>数据自检（排查用 · 点开）</summary>' +
+      '<div id="dbg-body"></div></details>';
+  }
+  function buildDbgBody() {
+    var el = document.getElementById('dbg-body');
+    if (!el || el.dataset.built) return;
+    el.dataset.built = '1';
+    var model = state.model;
+    var goodsById = {};
+    (model.goods || []).forEach(function (g) { goodsById[String(g.id)] = g; });
+    var purchases = model.purchases || [];
+    var goods = model.goods || [];
+    var ps = purchases.slice(0, DETAIL_LIMIT).map(function (p) {
+      var g = goodsById[String(p.goods_id)];
       return '<tr><td>' + p.id + '</td><td>' + p.goods_id + '</td><td>' +
         (p.unit_price == null ? '—' : (p.unit_price / 100).toFixed(2)) + '</td><td>' + num(p.quantity) + '</td><td>' +
         esc(p.price_status || '—') + '</td><td>' + esc(p.buy_date || '—') + '</td><td>' +
         esc(A.STATUS_LABELS[p.status] || p.status || '—') + '</td><td>' + esc(g ? g.name : '?') + '</td><td>' + esc(g ? g.ip : '?') + '</td></tr>';
     }).join('');
-    var gs = (model.goods || []).map(function (g) {
+    var gs = goods.slice(0, DETAIL_LIMIT).map(function (g) {
       return '<tr><td>' + g.id + '</td><td>' + esc(g.name || '') + '</td><td>' + esc(g.ip || '—') + '</td><td>' + esc(g.goods_type || '—') + '</td></tr>';
     }).join('');
-    return '<details class="dbg"><summary>数据自检（排查用 · 点开）</summary>' +
+    var pNote = purchases.length > DETAIL_LIMIT ? '<p class="dbg-tip">仅显示前 ' + DETAIL_LIMIT + ' 条（共 ' + purchases.length + ' 条）</p>' : '';
+    var gNote = goods.length > DETAIL_LIMIT ? '<p class="dbg-tip">仅显示前 ' + DETAIL_LIMIT + ' 个（共 ' + goods.length + ' 个）</p>' : '';
+    el.innerHTML =
       '<p class="dbg-tip">购入记录：id / goods_id / 单价(元) / 数量 / 价格状态 / 日期 / 在库状态 / 谷子名 / 谷子IP</p>' +
-      '<table class="dbg-tbl"><tbody>' + (ps || '<tr><td>无购入记录</td></tr>') + '</tbody></table>' +
+      '<table class="dbg-tbl"><tbody>' + (ps || '<tr><td>无购入记录</td></tr>') + '</tbody></table>' + pNote +
       '<p class="dbg-tip">谷子款：id / 名称 / IP / 类型</p>' +
-      '<table class="dbg-tbl"><tbody>' + (gs || '<tr><td>无谷子款</td></tr>') + '</tbody></table>' +
-    '</details>';
+      '<table class="dbg-tbl"><tbody>' + (gs || '<tr><td>无谷子款</td></tr>') + '</tbody></table>' + gNote;
+  }
+  function bindDbg() {
+    var box = document.getElementById('dbg-box');
+    if (!box || box.dataset.bound) return;
+    box.dataset.bound = '1';
+    on(box, 'toggle', function () { if (box.open) buildDbgBody(); });
   }
 
   function pageHTML() {
@@ -522,8 +543,11 @@
       '<span class="chart-detail-value">' + val + '</span>' +
       (meta ? '<span class="chart-detail-meta">' + meta + '</span>' : '') +
     '</div>';
-    var items = data.items && data.items.length
-      ? '<div class="chart-detail-list">' + data.items.map(function (it) {
+    var allItems = data.items || [];
+    state.detailCache = { id: detailId, items: allItems };
+    var vis = allItems.slice(0, DETAIL_LIMIT);
+    var itemsHtml = vis.length
+      ? '<div class="chart-detail-list">' + vis.map(function (it) {
           var st = it.status === 'estimated' ? '（估算）' : (it.status === 'unknown' ? '（未知价）' : '');
           return '<div class="chart-detail-item">' +
             '<span>' + esc(it.name) + ' ×' + it.qty + st + '</span>' +
@@ -531,7 +555,35 @@
           '</div>';
         }).join('') + '</div>'
       : '';
-    el.innerHTML = head + items;
+    var remain = allItems.length - DETAIL_LIMIT;
+    var moreBtn = remain > 0
+      ? '<button type="button" class="btn btn--sm" data-act="more-detail" data-did="' + detailId + '" data-offset="' + DETAIL_LIMIT + '">显示更多（剩余 ' + remain + ' 条）</button>'
+      : '';
+    el.innerHTML = head + itemsHtml + moreBtn;
+  }
+  function moreDetail(detailId) {
+    var cache = state.detailCache;
+    if (!cache || cache.id !== detailId) return;
+    var el = document.getElementById(detailId);
+    if (!el) return;
+    var btn = el.querySelector('[data-act="more-detail"]');
+    var start = btn ? Number(btn.dataset.offset || DETAIL_LIMIT) : DETAIL_LIMIT;
+    var items = cache.items;
+    var next = items.slice(start, start + DETAIL_LIMIT);
+    if (!next.length) { if (btn) btn.remove(); return; }
+    var list = el.querySelector('.chart-detail-list');
+    if (list) {
+      list.insertAdjacentHTML('beforeend', next.map(function (it) {
+        var st = it.status === 'estimated' ? '（估算）' : (it.status === 'unknown' ? '（未知价）' : '');
+        return '<div class="chart-detail-item">' +
+          '<span>' + esc(it.name) + ' ×' + it.qty + st + '</span>' +
+          '<span>' + money(it.cost) + '</span>' +
+        '</div>';
+      }).join(''));
+    }
+    var remain = items.length - (start + next.length);
+    if (remain > 0 && btn) { btn.dataset.offset = start + next.length; btn.textContent = '显示更多（剩余 ' + remain + ' 条）'; }
+    else if (btn) btn.remove();
   }
 
   // ---- 事件绑定 ----
@@ -574,8 +626,11 @@
       if (seg) { state.view = seg.dataset.view; rerender(); return; }
       var dim = e.target.closest('[data-dim]');
       if (dim) { state.rankDim = dim.dataset.dim; rerender(); return; }
+      var more = e.target.closest('[data-act="more-detail"]');
+      if (more) { moreDetail(more.dataset.did); return; }
     });
     bindCharts();
+    bindDbg();
   }
 
   function rerender() {

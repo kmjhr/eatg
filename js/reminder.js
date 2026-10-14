@@ -91,4 +91,20 @@
     }).catch(function () { return false; });
   };
 
+  /** 备份提醒：开启自动备份提醒且距上次备份超过周期 → 返回 {days, due}；否则返回 null */
+  R.checkBackup = function () {
+    return Promise.all([
+      EATG.storage.getSetting('auto_backup_remind'),
+      EATG.storage.getSetting('last_backup_at')
+    ]).then(function (r) {
+      var ab = r[0] || { enabled: false, period: 'weekly' };
+      if (!ab.enabled) return null;
+      var last = num(r[1]);
+      var periodDays = ab.period === 'monthly' ? 30 : 7;
+      if (!last) return { days: -1, due: true }; // 从未备份过
+      var days = Math.floor((Date.now() - last) / 86400000);
+      return { days: days, due: days >= periodDays };
+    }).catch(function () { return null; });
+  };
+
 })(window);

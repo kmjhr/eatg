@@ -222,6 +222,44 @@
 
   // ---- 启动 ----
 
+  /** 顶部备份提醒条：距上次备份超过周期时显示，点「去备份」直达数据管理，点 × 当天不再弹 */
+  function maybeShowBackupBanner(days) {
+    try {
+      var lastDismiss = Number(global.localStorage.getItem('eatg_backup_banner_dismiss') || 0);
+      if (global.Date.now() - lastDismiss < 86400000) return; // 24h 内关过不再弹
+      var banner = document.getElementById('backup-banner');
+      if (!banner) return;
+      var text = document.getElementById('backup-banner-text');
+      if (text) {
+        text.textContent = days < 0
+          ? '还没有备份过，防止数据丢失快去备份'
+          : '已 ' + days + ' 天没备份了，防止数据丢失快去备份';
+      }
+      banner.hidden = false;
+    } catch (e) { /* 静默 */ }
+  }
+
+  /** 创建备份提醒条 DOM（boot 时挂到 app 根部） */
+  function createBackupBanner() {
+    var banner = document.createElement('div');
+    banner.id = 'backup-banner';
+    banner.className = 'backup-banner';
+    banner.hidden = true;
+    banner.innerHTML =
+      '<b id="backup-banner-text"></b>' +
+      '<button id="backup-banner-go" type="button" class="btn btn--sm">去备份</button>' +
+      '<button id="backup-banner-x" type="button" class="backup-banner-x" aria-label="关闭">×</button>';
+    var appEl = document.getElementById('app');
+    if (appEl) appEl.appendChild(banner);
+    var go = document.getElementById('backup-banner-go');
+    if (go) go.addEventListener('click', function () { global.location.hash = '#/data'; });
+    var x = document.getElementById('backup-banner-x');
+    if (x) x.addEventListener('click', function () {
+      banner.hidden = true;
+      try { global.localStorage.setItem('eatg_backup_banner_dismiss', String(global.Date.now())); } catch (e) {}
+    });
+  }
+
   function boot() {
     if (booted) return;
     booted = true;
@@ -233,6 +271,8 @@
     dom.navActions = document.getElementById('nav-actions');
     dom.tabBar = document.getElementById('tab-bar');
     dom.pageContainer = document.getElementById('page-container');
+
+    createBackupBanner();
 
     if (dom.navBack) {
       dom.navBack.addEventListener('click', function () {
@@ -257,6 +297,14 @@
         if (EATG.reminder && EATG.reminder.checkAll) {
           EATG.reminder.checkAll().catch(function (e) {
             console.warn('[EATG] 提醒检查失败:', e);
+          });
+        }
+        // 备份提醒条：开启自动备份提醒且超期未备份时显示
+        if (EATG.reminder && EATG.reminder.checkBackup) {
+          EATG.reminder.checkBackup().then(function (r) {
+            if (r && r.due) maybeShowBackupBanner(r.days);
+          }).catch(function (e) {
+            console.warn('[EATG] 备份提醒检查失败:', e);
           });
         }
       }).catch(function (err) {

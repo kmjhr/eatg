@@ -1767,6 +1767,10 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .bs-progress-text{flex:0 0 auto;white-space:nowrap}
 .bs-progress-bar{flex:1;height:5px;border-radius:3px;background:var(--fill,#EEF1F7);overflow:hidden}
 .bs-progress-bar i{display:block;height:100%;width:0;background:var(--primary,#3D6DF5);transition:width .2s ease}
+/* 顶部备份提醒条 */
+.backup-banner{position:fixed;top:var(--nav-h,50px);left:0;right:0;z-index:80;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#FFF7E0;border-bottom:1px solid #F0C36D;color:#7A5B00;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.backup-banner b{flex:1;font-weight:600}
+.backup-banner-x{border:none;background:transparent;color:inherit;font-size:17px;line-height:1;padding:4px 6px;cursor:pointer}
 /* 统计页数据自检（排查用） */
 .dbg{margin:0 12px 8px;font-size:11px;color:var(--ink-2,#5B6478);background:var(--card,#fff);border:1px solid var(--line,#E6E9F0);border-radius:10px;padding:8px 10px}
 .dbg summary{cursor:pointer;font-size:12px;color:var(--primary,#3D6DF5)}

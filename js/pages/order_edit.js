@@ -183,7 +183,7 @@
         return '<option value="' + UI.esc(c) + '"' + (state.order.channel === c ? ' selected' : '') + '>' + UI.esc(c) + '</option>';
       }).join('');
     var img = state.orderImage
-      ? '<div class="order-img"><img src="' + state.orderImage + '" alt=""><button type="button" class="cell-del" data-act="rm-img" aria-label="移除截图">×</button></div>'
+      ? '<div class="order-img"><img src="' + state.orderImage + '" alt="" data-act="edit-img"><button type="button" class="cell-edit" data-act="edit-img">编辑</button><button type="button" class="cell-del" data-act="rm-img" aria-label="移除截图">×</button></div>'
       : '<span class="order-img-add" style="position:relative">＋<span>订单截图</span>' +
         '<input type="file" id="o-file" class="input-cover" accept="image/*"></span>';
     return '<div class="form-section">' +
@@ -706,6 +706,16 @@
 
   // ---- 截图 ----
 
+  function openEditor(src) {
+    if (!src || !EATG.imgEditor) return;
+    EATG.imgEditor.open(src).then(function (newSrc) {
+      if (state.destroyed || !newSrc || newSrc === src) return;
+      state.orderImage = newSrc;
+      render();
+      UI.toast('已保存编辑', 'success');
+    });
+  }
+
   function handleFile(file) {
     if (!file) return;
     UI.toast('正在压缩图片…');
@@ -715,6 +725,7 @@
       state.orderImage = dataUrl;
       render();
       UI.toast('已添加订单截图', 'success');
+      openEditor(dataUrl);
     }).catch(function (err) {
       console.error('[EATG] 订单截图压缩失败', err);
       UI.toast('图片处理失败：' + (err && err.message || err), 'error');
@@ -743,6 +754,7 @@
         return;
       }
       if (a === 'rm-img') { syncInputs(); state.orderImage = null; render(); UI.toast('已移除截图', 'success'); return; }
+      if (a === 'edit-img') { if (state.orderImage) openEditor(state.orderImage); return; }
       if (a === 'add-channel') { onAddChannel(); return; }
       if (a === 'save') { doSave(); return; }
       if (a === 'del-order') { doDelete(); return; }

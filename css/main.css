@@ -1371,6 +1371,17 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
   line-height: 1;
   background: rgba(0, 0, 0, 0.5);
 }
+.order-img .cell-edit {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(47, 111, 237, 0.85);
+}
 .order-img-add {
   display: flex;
   flex-direction: column;

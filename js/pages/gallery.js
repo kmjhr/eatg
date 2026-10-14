@@ -481,7 +481,6 @@
         return '<div class="gal-char-chip' + (on ? ' is-active' : '') + '" data-cid="' + c.id + '">' +
           (c.avatar ? '<img class="gal-avatar" src="' + esc(c.avatar) + '">' : '<div class="gal-avatar gal-avatar--ph">' + esc((c.name || '?').charAt(0)) + '</div>') +
           '<span class="gal-char-name">' + esc(c.name) + '</span>' +
-          '<button type="button" class="gal-char-del" data-char-del="' + c.id + '" aria-label="删除角色">×</button>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -891,37 +890,6 @@
     });
   }
 
-  /** 删除图鉴角色：从图鉴隐藏（gallery=false）+ 删除其全部图鉴条目；谷子库记录不受影响 */
-  function delGalleryChar(cid) {
-    var c = state.characters.filter(function (x) { return x.id === cid; })[0];
-    if (!c) return;
-    UI.confirmDialog({
-      title: '删除图鉴角色',
-      message: '删除「' + c.name + '」？将从图鉴移除该角色和它的全部图鉴条目（谷子库记录不受影响）。',
-      confirmText: '删除',
-      danger: true
-    }).then(function (ok) {
-      if (!ok) return;
-      c.gallery = false;
-      return S.put('characters', c).then(function () {
-        return S.getAll('gallery_items').then(function (items) {
-          var dels = (items || []).filter(function (it) { return it.character_id === cid; });
-          var p = Promise.resolve();
-          dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
-          return p;
-        });
-      }).then(function () {
-        UI.toast('已删除「' + c.name + '」', 'success');
-        if (state.currentCharId === cid) {
-          var rest = state.characters.filter(function (x) { return x.id !== cid; });
-          state.currentCharId = (rest[0] || {}).id || null;
-        }
-        state.characters = state.characters.filter(function (x) { return x.id !== cid; });
-        rerender();
-      });
-    });
-  }
-
   function go(hash) { if (EATG.app && EATG.app.navigate) EATG.app.navigate(hash); }
 
   function rerender() {
@@ -948,8 +916,6 @@
     if (!page) return;
     clearPageOffs(); // 回收上一次页内监听，避免重复绑定（点亮翻转偶数次失效 / 提示刷屏）
     pon(page.querySelector('#gal-char-scroll'), 'click', function (e) {
-      var del = e.target.closest('[data-char-del]');
-      if (del) { delGalleryChar(Number(del.dataset.charDel)); return; }
       var chip = e.target.closest('.gal-char-chip');
       if (chip) { state.currentCharId = Number(chip.dataset.cid); rerender(); }
     });

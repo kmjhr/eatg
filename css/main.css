@@ -1855,3 +1855,5 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .cat-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.06)}
 .cat-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cat-sel{flex:0 0 96px;height:32px;font-size:13px}
+/* 数据管理页 小分区标题 */
+.dm-block-title{margin:18px 0 8px;padding-left:10px;border-left:3px solid #f6c64b;font-size:14px;font-weight:600;color:var(--text,#1a1a1a)}

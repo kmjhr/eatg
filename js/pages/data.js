@@ -57,6 +57,17 @@
     { key: 'condition', label: '品相' }
   ];
 
+  // 图鉴五大品类（固定顺序）+ 默认类型→品类映射（与 gallery.js 保持一致）
+  var CATS = ['吧唧', '纸片', '立牌', '毛绒', '其他'];
+  var DEFAULT_TYPE_CAT = {
+    '徽章（吧唧）': '吧唧', '徽章': '吧唧', '吧唧': '吧唧', '亚克力徽章': '吧唧',
+    '罐徽章': '吧唧', '马口铁徽章': '吧唧', '金属徽章': '吧唧',
+    '色纸': '纸片', '拍立得': '纸片', '生写': '纸片', '卡片': '纸片', '卡牌': '纸片',
+    '明信片': '纸片', '贴纸': '纸片', '票根': '纸片',
+    '立牌': '立牌', '亚克力立牌': '立牌', '面板亚克力立牌': '立牌', '迷你亚克力立牌': '立牌',
+    '毛绒': '毛绒', '娃娃': '毛绒', 'ぬいぐるみ': '毛绒', '毛绒挂件': '毛绒', '毛绒玩偶': '毛绒'
+  };
+
   // 快捷词（与谷子编辑页共用 localStorage: eatg_quick_words）
   var QUICK_KEY = 'eatg_quick_words';
   var QW_FIELDS = [
@@ -77,7 +88,9 @@
       auto_backup_remind: S.SETTINGS_DEFAULTS.auto_backup_remind,
       enums: {},
       quickWords: {},
-      characters: []
+      characters: [],
+      galleryItems: [],
+      typeCatMap: {}
     };
     EXPORT_DIMS.forEach(function (d) { state.dims[d.key] = true; });
   }
@@ -87,7 +100,9 @@
       S.getSetting('last_backup_at'),
       S.getSetting('auto_backup_remind'),
       S.getAll('enums'),
-      S.getAll('characters')
+      S.getAll('characters'),
+      S.getAll('gallery_items'),
+      S.getSetting('gallery_type_cat_map')
     ]).then(function (r) {
       state.last_backup_at = r[0] || null;
       state.auto_backup_remind = r[1] || S.SETTINGS_DEFAULTS.auto_backup_remind;
@@ -96,6 +111,13 @@
       state.enums = enumsMap;
       state.quickWords = loadQuickWordsMerged();
       state.characters = r[3] || [];
+      state.galleryItems = r[4] || [];
+      state.typeCatMap = {};
+      for (var k in DEFAULT_TYPE_CAT) state.typeCatMap[k] = DEFAULT_TYPE_CAT[k];
+      var saved = r[5];
+      if (saved && typeof saved === 'object') {
+        for (var k2 in saved) state.typeCatMap[k2] = saved[k2];
+      }
     });
   }
 
@@ -359,21 +381,20 @@
     '</div>';
   }
 
-  /** 角色管理：谷子详情角色字段（characters store），与图鉴分类独立 */
+  /** 谷子角色区：谷子详情角色字段选项（gallery===false），与图鉴人物分开管理 */
   function charsHTML() {
-    var chars = state.characters || [];
+    var chars = (state.characters || []).filter(function (c) { return c.gallery === false; });
     var chips = chars.map(function (c, i) {
-      var tag = c.gallery === false ? '<i class="dm-chip-tag">谷子</i>' : (c.gallery ? '<i class="dm-chip-tag dm-chip-tag--gal">图鉴</i>' : '');
       return '<span class="dm-chip">' +
-        '<button type="button" class="dm-chip-word" data-act="edit-char" data-i="' + i + '">' + esc(c.name) + tag + '</button>' +
+        '<button type="button" class="dm-chip-word" data-act="edit-char" data-i="' + i + '">' + esc(c.name) + '</button>' +
         '<button type="button" class="dm-chip-x" data-act="del-char" data-i="' + i + '">×</button></span>';
     }).join('');
     return '<div class="dm-section">' +
-      '<div class="dm-section-title">角色</div>' +
-      '<p class="dm-note">谷子详情的角色字段选项；「图鉴」= 显示在图鉴分类，「谷子」= 仅谷子侧使用。删除角色会同时从图鉴移除并删除其图鉴条目。</p>' +
+      '<div class="dm-section-title">谷子角色</div>' +
+      '<p class="dm-note">谷子详情的角色选项（仅谷子侧使用）。删除仅从谷子库移除该选项，不影响图鉴。</p>' +
       '<div class="dm-group">' +
-        '<div class="dm-chips">' + (chips || '<span class="muted">暂无角色</span>') + '</div>' +
-        '<div class="dm-add-row"><input class="input" id="char-add" type="text" autocomplete="off" placeholder="新增角色名">' +
+        '<div class="dm-chips">' + (chips || '<span class="muted">暂无谷子角色</span>') + '</div>' +
+        '<div class="dm-add-row"><input class="input" id="char-add" type="text" autocomplete="off" placeholder="新增谷子角色名">' +
         '<button type="button" class="btn btn--sm" data-act="add-char">添加</button></div>' +
       '</div>' +
     '</div>';
@@ -385,29 +406,24 @@
     if (state.characters.some(function (c) { return c.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
     S.add('characters', { name: v, ip: '其他', is_favorite: false, gallery: false }).then(function (id) {
       state.characters.push({ id: Number(id), name: v, ip: '其他', is_favorite: false, gallery: false });
-      UI.toast('已添加角色（谷子侧）', 'success'); rerender();
+      UI.toast('已添加谷子角色', 'success'); rerender();
     }).catch(function () { UI.toast('保存失败', 'error'); });
   }
+  /** 谷子角色删除：仅移除谷子侧选项（谷子中引用它的将不再显示名字），不动图鉴 */
   function delChar(i) {
-    var c = state.characters[i];
+    var chars = (state.characters || []).filter(function (c) { return c.gallery === false; });
+    var c = chars[i];
     if (!c) return;
     UI.confirmDialog({
-      title: '删除角色',
-      message: '删除「' + c.name + '」？谷子中引用该角色的将不再显示名字；图鉴分类与条目也会一并移除。',
+      title: '删除谷子角色',
+      message: '删除谷子角色「' + c.name + '」？谷子中引用该角色的将不再显示名字；图鉴不受影响。',
       confirmText: '删除',
       danger: true
     }).then(function (ok) {
       if (!ok) return;
       S.del('characters', c.id).then(function () {
-        return S.getAll('gallery_items').then(function (items) {
-          var dels = (items || []).filter(function (it) { return it.character_id === c.id; });
-          var p = Promise.resolve();
-          dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
-          return p;
-        });
-      }).then(function () {
+        state.characters = state.characters.filter(function (x) { return x.id !== c.id; });
         UI.toast('已删除', 'success');
-        state.characters.splice(i, 1);
         rerender();
       }).catch(function () { UI.toast('删除失败', 'error'); });
     });
@@ -433,6 +449,132 @@
       c.name = v;
       S.put('characters', c).then(function () { UI.toast('已保存', 'success'); ref.close(); rerender(); })
         .catch(function () { UI.toast('保存失败', 'error'); });
+    });
+  }
+
+  /** 图鉴角色区：图鉴分类的角色（gallery!==false，含历史/导入角色） */
+  function galCharsHTML() {
+    var chars = (state.characters || []).filter(function (c) { return c.gallery !== false; });
+    var chips = chars.map(function (c, i) {
+      return '<span class="dm-chip">' +
+        '<button type="button" class="dm-chip-word" data-act="edit-galchar" data-i="' + i + '">' + esc(c.name) + '</button>' +
+        '<button type="button" class="dm-chip-x" data-act="del-galchar" data-i="' + i + '">×</button></span>';
+    }).join('');
+    return '<div class="dm-section">' +
+      '<div class="dm-section-title">图鉴人物</div>' +
+      '<p class="dm-note">图鉴分类用的角色（如长崎素世）。删除会同时移除该人物的图鉴条目，谷子记录不受影响。</p>' +
+      '<div class="dm-group">' +
+        '<div class="dm-chips">' + (chips || '<span class="muted">暂无图鉴人物</span>') + '</div>' +
+        '<div class="dm-add-row"><input class="input" id="gal-add" type="text" autocomplete="off" placeholder="新增图鉴人物名">' +
+        '<button type="button" class="btn btn--sm" data-act="add-galchar">添加</button></div>' +
+      '</div>' +
+    '</div>';
+  }
+  function addGalChar() {
+    var input = document.getElementById('gal-add');
+    var v = input ? input.value.trim() : '';
+    if (!v) { UI.toast('请输入角色名', 'error'); return; }
+    if (state.characters.some(function (c) { return c.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
+    S.add('characters', { name: v, ip: '其他', is_favorite: false, gallery: true }).then(function (id) {
+      state.characters.push({ id: Number(id), name: v, ip: '其他', is_favorite: false, gallery: true });
+      UI.toast('已添加图鉴人物', 'success'); rerender();
+    }).catch(function () { UI.toast('保存失败', 'error'); });
+  }
+  function editGalChar(i) {
+    var chars = (state.characters || []).filter(function (c) { return c.gallery !== false; });
+    var c = chars[i];
+    if (!c) return;
+    var ref = UI.sheet({
+      title: '编辑图鉴人物',
+      bodyHTML: '<div class="field"><div class="field-head"><label class="field-label">角色名</label></div>' +
+        '<input class="input" id="gal-edit-name" autocomplete="off" value="' + esc(c.name) + '"></div>' +
+        '<div class="field"><div class="field-head"><label class="field-label">所属 IP</label></div>' +
+        '<input class="input" id="gal-edit-ip" autocomplete="off" value="' + esc(c.ip || '') + '"></div>',
+      footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+        '<button type="button" class="btn btn--primary" data-act="ok">保存</button>'
+    });
+    var nameInput = ref.body.querySelector('#gal-edit-name');
+    if (nameInput) setTimeout(function () { nameInput.focus(); }, 0);
+    if (ref.foot) ref.foot.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act !== 'ok') { ref.close(); return; }
+      var name = nameInput ? nameInput.value.trim() : '';
+      var ip = (ref.body.querySelector('#gal-edit-ip') || {}).value || '';
+      if (!name) { UI.toast('内容不能为空', 'error'); return; }
+      if (state.characters.some(function (x) { return x.id !== c.id && x.name === name; })) { UI.toast('该角色已存在', 'error'); return; }
+      c.name = name;
+      c.ip = ip.trim();
+      S.put('characters', c).then(function () { UI.toast('已保存', 'success'); ref.close(); rerender(); })
+        .catch(function () { UI.toast('保存失败', 'error'); });
+    });
+  }
+  /** 图鉴人物删除：从图鉴移除（gallery=false）+ 删除其图鉴条目；谷子记录保留 */
+  function delGalChar(i) {
+    var chars = (state.characters || []).filter(function (c) { return c.gallery !== false; });
+    var c = chars[i];
+    if (!c) return;
+    UI.confirmDialog({
+      title: '删除图鉴人物',
+      message: '删除「' + c.name + '」？将移除该人物的图鉴分类和全部图鉴条目；谷子库记录不受影响。',
+      confirmText: '删除',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      c.gallery = false;
+      S.put('characters', c).then(function () {
+        return S.getAll('gallery_items').then(function (items) {
+          var dels = (items || []).filter(function (it) { return it.character_id === c.id; });
+          var p = Promise.resolve();
+          dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
+          return p;
+        });
+      }).then(function () {
+        UI.toast('已删除「' + c.name + '」（谷子记录保留）', 'success');
+        rerender();
+      }).catch(function () { UI.toast('删除失败', 'error'); });
+    });
+  }
+
+  /** 品类映射区：把谷子类型归入图鉴五大品类 */
+  function catHTML() {
+    var seen = {}, types = [];
+    (state.galleryItems || []).forEach(function (it) {
+      var t = String(it.goods_type || '').trim();
+      if (t && !seen[t]) { seen[t] = true; types.push(t); }
+    });
+    for (var k in DEFAULT_TYPE_CAT) {
+      if (!seen[k]) { seen[k] = true; types.push(k); }
+    }
+    types.sort();
+    var rows = types.map(function (t) {
+      var cur = state.typeCatMap[t] || '其他';
+      return '<div class="cat-row"><span class="cat-name">' + esc(t) + '</span>' +
+        '<select class="input cat-sel" data-type="' + esc(t) + '">' +
+        CATS.map(function (c) { return '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') +
+        '</select></div>';
+    }).join('');
+    return '<div class="dm-section">' +
+      '<div class="dm-section-title">品类映射</div>' +
+      '<p class="dm-note">把谷子类型归入图鉴五大品类（吧唧/纸片/立牌/毛绒/其他），按品类分组时生效；未列出的类型默认归「其他」。</p>' +
+      '<div class="dm-group">' + (rows || '<span class="muted">暂无类型</span>') +
+        '<div class="dm-actions"><button type="button" class="btn btn--primary" data-act="save-cat">保存品类映射</button></div>' +
+      '</div>' +
+    '</div>';
+  }
+  function saveCat() {
+    var map = {};
+    var sels = document.querySelectorAll('.cat-sel');
+    for (var i = 0; i < sels.length; i++) map[sels[i].dataset.type] = sels[i].value;
+    S.setSetting('gallery_type_cat_map', map).then(function () {
+      state.typeCatMap = {};
+      for (var k2 in DEFAULT_TYPE_CAT) state.typeCatMap[k2] = DEFAULT_TYPE_CAT[k2];
+      for (var k3 in map) state.typeCatMap[k3] = map[k3];
+      UI.toast('品类映射已保存', 'success');
+      rerender();
+    }).catch(function (err) {
+      console.error('[EATG] 品类映射保存失败', err);
+      UI.toast('保存失败', 'error');
     });
   }
 
@@ -574,6 +716,10 @@
     if (a === 'add-char') { addChar(); return; }
     if (a === 'del-char') { delChar(Number(b.dataset.i)); return; }
     if (a === 'edit-char') { editChar(Number(b.dataset.i)); return; }
+    if (a === 'add-galchar') { addGalChar(); return; }
+    if (a === 'del-galchar') { delGalChar(Number(b.dataset.i)); return; }
+    if (a === 'edit-galchar') { editGalChar(Number(b.dataset.i)); return; }
+    if (a === 'save-cat') { saveCat(); return; }
   }
 
   function dimCheckboxes() {
@@ -615,9 +761,14 @@
         '<div class="dm-note">恢复前会自动备份当前数据（.pre-restore-时间戳）。仅支持 app=eatg、version≤1 的备份文件。</div>' +
       '</div>' +
 
+      '<div class="dm-block-title">收藏库 · 谷子管理</div>' +
       enumsHTML() +
       charsHTML() +
       quickHTML() +
+
+      '<div class="dm-block-title">图鉴 · 图鉴管理</div>' +
+      galCharsHTML() +
+      catHTML() +
 
       '<div class="dm-footer">所有数据仅存于本机浏览器，不上传服务器。</div>' +
     '</div>';

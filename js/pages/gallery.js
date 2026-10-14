@@ -45,7 +45,7 @@
       purchasesByGoods: {},
       currentCharId: null,
       search: '',
-      groupBySeries: true,
+      groupBySeries: false, // 默认不分组（平铺全部条目），可点「按系列分组」切换
       swipeMode: false
     };
     resetDeck();

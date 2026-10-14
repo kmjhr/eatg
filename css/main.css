@@ -1757,6 +1757,12 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .bs-progress-text{flex:0 0 auto;white-space:nowrap}
 .bs-progress-bar{flex:1;height:5px;border-radius:3px;background:var(--fill,#EEF1F7);overflow:hidden}
 .bs-progress-bar i{display:block;height:100%;width:0;background:var(--primary,#3D6DF5);transition:width .2s ease}
+/* 统计页数据自检（排查用） */
+.dbg{margin:0 12px 8px;font-size:11px;color:var(--ink-2,#5B6478);background:var(--card,#fff);border:1px solid var(--line,#E6E9F0);border-radius:10px;padding:8px 10px}
+.dbg summary{cursor:pointer;font-size:12px;color:var(--primary,#3D6DF5)}
+.dbg-tip{margin:6px 0 2px}
+.dbg-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.dbg-tbl td{border-bottom:1px solid var(--line,#EEF0F4);padding:3px 4px;white-space:nowrap}
 /* 弹层内弹出的选图选项行（位于底部按钮上方，不依赖全局抽屉层级） */
 .bs-pick-options{position:absolute;left:0;right:0;bottom:66px;z-index:5;background:var(--card,#fff);border-top:1px solid var(--line,#E6E9F0);box-shadow:0 -4px 12px rgba(0,0,0,.08);display:none}
 .bs-pick-options .opt-row:last-child{border-bottom:none}

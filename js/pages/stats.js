@@ -390,9 +390,29 @@
     '</div>';
   }
 
+  function dbgHTML(model) {
+    function gName(id) { var hit = null; (model.goods || []).forEach(function (g) { if (String(g.id) === String(id)) hit = g; }); return hit; }
+    var ps = (model.purchases || []).map(function (p) {
+      var g = gName(p.goods_id);
+      return '<tr><td>' + p.id + '</td><td>' + p.goods_id + '</td><td>' +
+        (p.unit_price == null ? '—' : (p.unit_price / 100).toFixed(2)) + '</td><td>' + num(p.quantity) + '</td><td>' +
+        esc(p.price_status || '—') + '</td><td>' + esc(g ? g.name : '?') + '</td><td>' + esc(g ? g.ip : '?') + '</td></tr>';
+    }).join('');
+    var gs = (model.goods || []).map(function (g) {
+      return '<tr><td>' + g.id + '</td><td>' + esc(g.name || '') + '</td><td>' + esc(g.ip || '—') + '</td><td>' + esc(g.goods_type || '—') + '</td></tr>';
+    }).join('');
+    return '<details class="dbg"><summary>数据自检（排查用 · 点开）</summary>' +
+      '<p class="dbg-tip">购入记录：id / goods_id / 单价(元) / 数量 / 价格状态 / 谷子名 / 谷子IP</p>' +
+      '<table class="dbg-tbl"><tbody>' + (ps || '<tr><td>无购入记录</td></tr>') + '</tbody></table>' +
+      '<p class="dbg-tip">谷子款：id / 名称 / IP / 类型</p>' +
+      '<table class="dbg-tbl"><tbody>' + (gs || '<tr><td>无谷子款</td></tr>') + '</tbody></table>' +
+    '</details>';
+  }
+
   function pageHTML() {
     return '<div class="page-scroll" id="stats-page">' +
       overviewHTML() +
+      dbgHTML(state.model) +
       caliberHTML() +
       chartsHTML() +
       rankingHTML() +
@@ -458,6 +478,14 @@
   function showDetail(detailId, data, kind) {
     var el = document.getElementById(detailId);
     if (!el || !data) { el.innerHTML = ''; return; }
+    // 状态占比：data 只有 {label, value=剩余件数}，无 items —— 显示件数，不是金额
+    if (data.items == null) {
+      el.innerHTML = '<div class="chart-detail-row">' +
+        '<span class="chart-detail-label">' + esc(data.label) + '</span>' +
+        '<span class="chart-detail-value">' + num(data.value) + ' 件</span>' +
+      '</div>';
+      return;
+    }
     var val = kind === 'ship' ? money(num(data.ship)) : money(num(data.value));
     var meta = data.count != null ? data.count + ' 件' : '';
     if (num(data.unknown) > 0) meta += '（含 ' + num(data.unknown) + ' 件未知价）';
@@ -534,7 +562,7 @@
   function rerender() {
     var page = document.getElementById('stats-page');
     if (!page) return;
-    page.innerHTML = overviewHTML() + caliberHTML() + chartsHTML() + rankingHTML();
+    page.innerHTML = overviewHTML() + dbgHTML(state.model) + caliberHTML() + chartsHTML() + rankingHTML();
     renderCharts();
     bindCharts();
   }

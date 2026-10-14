@@ -65,8 +65,8 @@
   }
 
   /** 按 key 聚合 {label, value, count, unknown, items}
-   *  mode='filled'（分开统计）：金额与件数都只计已填写（估算/未知件「当作不存在」）
-   *  mode='all'（总统计）：金额计已填写+估算；件数含全部（估算/未知件也计入）；unknown 记录未知价件数
+   *  value（成本）始终 = 已填写+估算（未知当 0）——与谷子详情页「总投入」一致，不受口径切换影响
+   *  count（件数）按口径：mode='filled' 只计已填写件（估算/未知「当作不存在」）；mode='all' 计全部件
    *  items：该组各条记录的构成明细（谷子名×数量·金额·状态），供点击展开自查 */
   function groupCostBy(model, keyFn, labelFn, mode, goodsById) {
     var map = {}, order = [];
@@ -81,11 +81,9 @@
         map[k].value += cost; map[k].count += q;
         map[k].items.push({ name: name, qty: q, cost: cost, status: 'filled' });
       } else if (p.price_status === 'estimated') {
-        if (mode === 'all') {
-          map[k].value += cost; map[k].count += q;
-          map[k].items.push({ name: name, qty: q, cost: cost, status: 'estimated' });
-        }
-        // filled 模式：估算件当作不存在
+        map[k].value += cost;               // 成本始终含估算
+        if (mode === 'all') map[k].count += q;
+        map[k].items.push({ name: name, qty: q, cost: cost, status: 'estimated' });
       } else if (mode === 'all') {
         map[k].count += q; map[k].unknown += q;
         map[k].items.push({ name: name, qty: q, cost: 0, status: 'unknown' });
@@ -343,7 +341,9 @@
   }
 
   function chartsHTML() {
-    var hint = state.view === 'total' ? '按件数 · 点扇区看含估算成本' : '按件数 · 点扇区看已填写成本';
+    var hint = state.view === 'total'
+      ? '按件数（含估算/未知）· 点扇区看成本（含估算，未知计 0）'
+      : '按件数（仅已填写）· 点扇区看成本（含估算，未知计 0）';
     return '<div class="charts-grid">' +
       chartBlockHTML('chart-ip', 'IP 占比', hint) +
       chartBlockHTML('chart-type', '类型占比', hint) +

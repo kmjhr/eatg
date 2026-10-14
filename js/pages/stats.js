@@ -64,13 +64,17 @@
     return total;
   }
 
-  /** 按 key 聚合 {label, value}，value 取购入总成本（filled+estimated） */
-  function groupCostBy(model, keyFn, labelFn) {
+  /** 按 key 聚合 {label, value, count, unknown}
+   *  mode='filled'（分开统计）：value 只计已填写（明确价格）
+   *  mode='all'（总统计）：value 计已填写+估算（unknown 金额无法计，按 0）
+   *  count 始终含全部件数（估算/未知件也计入占比）；unknown 记录未知价件数 */
+  function groupCostBy(model, keyFn, labelFn, mode) {
     var map = {}, order = [];
     (model.purchases || []).forEach(function (p) {
       var k = keyFn(p) || '未分类';
-      if (!map[k]) { map[k] = { label: labelFn(p, k) || k, value: 0, count: 0 }; order.push(k); }
-      map[k].value += A.purchaseCost(p);
+      if (!map[k]) { map[k] = { label: labelFn(p, k) || k, value: 0, count: 0, unknown: 0 }; order.push(k); }
+      if (p.price_status === 'unknown') map[k].unknown += num(p.quantity);
+      if (mode !== 'filled' || p.price_status === 'filled') map[k].value += A.purchaseCost(p);
       map[k].count += num(p.quantity);
     });
     return order.map(function (k) { return map[k]; });
@@ -325,9 +329,10 @@
   }
 
   function chartsHTML() {
+    var hint = state.view === 'total' ? '按件数 · 点扇区看含估算成本' : '按件数 · 点扇区看已填写成本';
     return '<div class="charts-grid">' +
-      chartBlockHTML('chart-ip', 'IP 占比', '按件数 · 点扇区看成本') +
-      chartBlockHTML('chart-type', '类型占比', '按件数 · 点扇区看成本') +
+      chartBlockHTML('chart-ip', 'IP 占比', hint) +
+      chartBlockHTML('chart-type', '类型占比', hint) +
       chartBlockHTML('chart-status', '状态占比', '按剩余件数') +
       '<div class="chart-block chart-block--wide">' +
         '<div class="chart-title">月度花费<span class="chart-hint">柱状=成本，折线=邮费占比</span></div>' +
@@ -397,11 +402,13 @@
     chartRefs = [];
     var goodsById = {};
     (state.model.goods || []).forEach(function (g) { goodsById[g.id] = g; });
+    var mode = state.view === 'total' ? 'all' : 'filled';
 
     // IP 占比
     var ipData = groupCostBy(state.model,
       function (p) { var g = goodsById[p.goods_id]; return g ? g.ip : ''; },
-      function (p, k) { return k; });
+      function (p, k) { return k; },
+      mode);
     var ipSegs = donutSegments(ipData);
     var ipCanvas = document.getElementById('chart-ip');
     var ipRef = drawDonut(ipCanvas, ipSegs, String(ipData.reduce(function (a, d) { return a + d.count; }, 0)), '件');
@@ -411,7 +418,8 @@
     // 类型占比
     var typeData = groupCostBy(state.model,
       function (p) { var g = goodsById[p.goods_id]; return g ? g.goods_type : ''; },
-      function (p, k) { return k; });
+      function (p, k) { return k; },
+      mode);
     var typeSegs = donutSegments(typeData);
     var typeCanvas = document.getElementById('chart-type');
     var typeRef = drawDonut(typeCanvas, typeSegs, String(typeData.reduce(function (a, d) { return a + d.count; }, 0)), '件');
@@ -438,6 +446,7 @@
     if (!el || !data) { el.innerHTML = ''; return; }
     var val = kind === 'ship' ? money(num(data.ship)) : money(num(data.value));
     var meta = data.count != null ? data.count + ' 件' : '';
+    if (num(data.unknown) > 0) meta += '（含 ' + num(data.unknown) + ' 件未知价）';
     // 月度：同时展示成本与邮费
     if (data.cost != null && data.ship != null) {
       el.innerHTML = '<div class="chart-detail-row">' +

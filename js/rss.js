@@ -167,30 +167,67 @@
       .trim();
   }
 
-  function isChinese(s) {
-    return /[\u4e00-\u9fff]/.test(s);
+  /** 检测是否含日文假名（平假名/片假名）——日文标题即使全汉字+假名混排也算日文 */
+  function hasKana(s) {
+    return /[\u3040-\u30ff\uff66-\uff9f]/.test(s);
   }
 
-  /** 批量翻译（一次请求，\n 分隔）；非中文才翻译；返回与原数组等长的数组（null = 不翻译/失败） */
-  function translateBatch(texts) {
-    var need = [], idx = [];
-    texts.forEach(function (t, i) {
-      if (t && !isChinese(t)) { need.push(t); idx.push(i); }
-    });
-    var out = texts.map(function () { return null; });
-    if (!need.length) return Promise.resolve(out);
-    var q = need.join('\n');
-    return fetchJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=' + encodeURIComponent(q))
+  /** 单语言批量翻译；返回 { segs: 与 texts 等长数组(null=未翻译/与原文相同), lang: 检测语言 } */
+  function trans(sl, texts) {
+    var q = texts.join('\n');
+    return fetchJSON('https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sl + '&tl=zh-CN&dt=t&q=' + encodeURIComponent(q))
       .then(function (j) {
         var arr = j && j[0];
-        if (!arr || !arr.length) return out;
-        need.forEach(function (t, k) {
-          var seg = arr[k];
-          if (seg && seg[0] && seg[0] !== t) out[idx[k]] = seg[0];
-        });
-        return out;
+        var lang = (j && j[2]) || '';
+        if (!arr || !arr.length) return { segs: texts.map(function () { return null; }), lang: lang };
+        return {
+          lang: lang,
+          segs: texts.map(function (t, k) {
+            var seg = arr[k];
+            return (seg && seg[0] && seg[0] !== t) ? seg[0] : null;
+          })
+        };
       })
-      .catch(function () { return out; });
+      .catch(function () { return { segs: texts.map(function () { return null; }), lang: '' }; });
+  }
+
+  /** 批量翻译（一次请求，\n 分隔）。
+      分组：含假名 → 强制 ja→zh-CN（避免 auto 把日文误判为中文）；
+            其余 → auto→zh-CN，若 auto 原样返回、检测语言非中文、且含汉字
+                   （疑似日文汉字标题被误判），再用 sl=ja 重试一次。 */
+  function translateBatch(texts) {
+    var out = texts.map(function () { return null; });
+    var ja = [], jaIdx = [], other = [], otherIdx = [];
+    texts.forEach(function (t, i) {
+      if (!t) return;
+      if (hasKana(t)) { ja.push(t); jaIdx.push(i); }
+      else { other.push(t); otherIdx.push(i); }
+    });
+    var chain = Promise.resolve();
+    if (ja.length) {
+      chain = chain.then(function () {
+        return trans('ja', ja).then(function (res) {
+          res.segs.forEach(function (s, k) { if (s) out[jaIdx[k]] = s; });
+        });
+      });
+    }
+    if (other.length) {
+      chain = chain.then(function () {
+        return trans('auto', other).then(function (res) {
+          var retry = [], retryK = [];
+          res.segs.forEach(function (s, k) {
+            if (s) out[otherIdx[k]] = s;
+            else if (res.lang !== 'zh' && /[\u4e00-\u9fff]/.test(other[k])) { retry.push(other[k]); retryK.push(k); }
+          });
+          if (retry.length) {
+            return trans('ja', retry).then(function (res2) {
+              res2.segs.forEach(function (s, k) { if (s) out[otherIdx[retryK[k]]] = s; });
+            });
+          }
+        });
+      });
+    }
+    return chain.then(function () { return out; }).catch(function () { return out; });
   }
 
   /** 抓取单个监控源 → { ok, added, skipped, error, ms }；成功时写回 last_fetch_at/last_result */
@@ -213,12 +250,39 @@
       var titleZh = pack.titleZh;
       var descZh = pack.descZh;
       return S.query('news', 'source_id', sid).then(function (exist) {
-        var have = {};
-        (exist || []).forEach(function (n) {
-          if (n.link) have[n.link] = 1;
-          else if (n.title_raw) have['t:' + n.title_raw] = 1;
-          else if (n.title) have['t:' + n.title] = 1;
-        });
+        var existList = exist || [];
+        // 旧数据补翻：已存在且标题含日文假名、且没有译文（title_raw）的条目，重新翻译更新
+        var needRepair = existList.filter(function (n) { return n.title && !n.title_raw && hasKana(n.title); });
+        var repairChain = Promise.resolve();
+        if (needRepair.length) {
+          repairChain = translateBatch(needRepair.map(function (n) { return n.title; })).then(function (zhs) {
+            var updates = [];
+            needRepair.forEach(function (n, i) {
+              var zh = zhs[i];
+              if (zh && zh !== n.title) {
+                n.title_raw = n.title;
+                n.title = zh;
+                updates.push(n);
+              }
+            });
+            var w = Promise.resolve();
+            updates.forEach(function (n) { w = w.then(function () { return S.put('news', n); }); });
+            return w;
+          });
+        }
+        return repairChain.then(function () { return { items: items, titleZh: titleZh, descZh: descZh, existList: existList }; });
+      });
+    }).then(function (pack) {
+      var items = pack.items;
+      var titleZh = pack.titleZh;
+      var descZh = pack.descZh;
+      var existList = pack.existList;
+      var have = {};
+      existList.forEach(function (n) {
+        if (n.link) have[n.link] = 1;
+        else if (n.title_raw) have['t:' + n.title_raw] = 1;
+        else if (n.title) have['t:' + n.title] = 1;
+      });
         var skipped = 0;
         var recs = [];
         items.forEach(function (it, i) {
@@ -246,7 +310,6 @@
         return write.then(function () {
           return { ok: true, added: recs.length, skipped: skipped, error: null, ms: Date.now() - t0 };
         });
-      });
     }).then(function (res) {
       return recordResult(src, res).then(function () { return res; });
     }).catch(function (err) {

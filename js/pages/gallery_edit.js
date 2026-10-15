@@ -99,15 +99,15 @@
         '<div class="field"><div class="field-head"><label class="field-label">发售日期</label></div>' +
           '<input id="ge-date" class="input" type="date" value="' + esc(it.release_date) + '"></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
-          '<div class="ge-img-row">' +
-            (it.image ? '<img class="ge-img" id="ge-img-view" src="' + esc(it.image) + '" alt="条目图">' : '<div class="ge-img ge-img--ph">无图</div>') +
-            '<span class="btn btn--secondary ge-img-file" style="position:relative">拍照' +
-              '<input type="file" id="ge-img-cam" class="input-cover" accept="image/*" capture="environment"></span>' +
-            '<span class="btn btn--secondary ge-img-file" style="position:relative">相册' +
-              '<input type="file" id="ge-img-album" class="input-cover" accept="image/*"></span>' +
-            (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-edit">编辑</button>' : '') +
-            (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-clear">清除</button>' : '') +
-          '</div></div>' +
+          '<div class="grid9" id="ge-grid">' +
+            (it.image
+              ? '<div class="grid9-cell"><img id="ge-img-view" src="' + esc(it.image) + '" alt="" data-edit="0">' +
+                '<button type="button" class="cell-del" id="ge-img-clear" aria-label="移除图片">×</button>' +
+                '<button type="button" class="cell-edit" id="ge-img-edit" aria-label="编辑图片（旋转/裁剪）">✎</button></div>'
+              : '') +
+            '<button type="button" class="grid9-add" id="ge-img-add" aria-label="添加图片">＋<span>添加图片</span></button>' +
+          '</div>' +
+          '<p class="hint">点图或 ✎ 编辑（旋转/裁剪），× 移除；「添加图片」拍照/相册选图，选中后先编辑再确认</p></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">关联谷子款（可选）</label></div>' +
           '<select id="ge-goods" class="input">' + goodsOpts() + '</select>' +
           '<p class="hint">关联后以谷子购入状态自动判定拥有情况</p></div>' +
@@ -133,24 +133,52 @@
     dom.goods = p.querySelector('#ge-goods');
     dom.owned = p.querySelector('#ge-owned');
     dom.imgView = p.querySelector('#ge-img-view');
-    dom.imgCam = p.querySelector('#ge-img-cam');
-    dom.imgAlbum = p.querySelector('#ge-img-album');
     dom.imgEdit = p.querySelector('#ge-img-edit');
     dom.imgClear = p.querySelector('#ge-img-clear');
+    dom.imgAdd = p.querySelector('#ge-img-add');
   }
 
   function bind(ctx) {
-    // 拍照/相册：选中照片后先弹编辑器（旋转/裁剪）确认再替换
-    on(dom.imgCam, 'change', function () { pickAndEdit(dom.imgCam); });
-    on(dom.imgAlbum, 'change', function () { pickAndEdit(dom.imgAlbum); });
+    // 与谷子页一致：点图/✎ 编辑（旋转/裁剪）、× 移除、＋ 添加（拍照/相册选择单，选中后先编辑）
     if (dom.imgView) on(dom.imgView, 'click', function () { openEdit(); });
     if (dom.imgEdit) on(dom.imgEdit, 'click', function () { openEdit(); });
     if (dom.imgClear) on(dom.imgClear, 'click', function () { state.item.image = ''; rerender(); });
+    if (dom.imgAdd) on(dom.imgAdd, 'click', openAddImageSheet);
     on(dom.page, 'click', function (e) {
       var act = e.target.closest('[data-act]');
       if (!act) return;
       if (act.dataset.act === 'save') doSave(ctx);
       else if (act.dataset.act === 'del') doDel(ctx);
+    });
+  }
+
+  /** 「添加图片」：拍照/相册选择单；选中照片后先编辑（旋转/裁剪）再替换 */
+  function openAddImageSheet() {
+    var ref = UI.sheet({
+      title: '添加图片',
+      bodyHTML: '<div class="opt-list">' +
+        '<span class="opt-row opt-row--file" data-src="camera">' +
+          '<button type="button" class="opt-row-btn">拍照</button>' +
+          '<input type="file" class="input-cover" accept="image/*" capture="environment" data-src="camera">' +
+          '<span class="opt-check">›</span></span>' +
+        '<span class="opt-row opt-row--file" data-src="album">' +
+          '<button type="button" class="opt-row-btn">从相册选择</button>' +
+          '<input type="file" class="input-cover" accept="image/*" data-src="album">' +
+          '<span class="opt-check">›</span></span>' +
+        '</div>'
+    });
+    ref.body.addEventListener('change', function (e) {
+      var inp = e.target.closest('input[type=file]');
+      if (!inp) return;
+      ref.close();
+      pickAndEdit(inp);
+    });
+    ref.body.addEventListener('click', function (e) {
+      var row = e.target.closest('.opt-row--file');
+      if (!row) return;
+      var inp = row.querySelector('input[type=file]');
+      if (!inp || e.target === inp) return;
+      try { inp.click(); } catch (err) { console.error('[EATG] 图鉴选图兜底失败', err); }
     });
   }
 

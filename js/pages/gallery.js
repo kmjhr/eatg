@@ -679,8 +679,7 @@
           '<span class="switch-label">点亮模式（点击卡片标记拥有）</span></label>' +
         '<span class="gal-swipe-opt-tip">默认关闭防误触 · 打开后点击卡片 = 点亮/取消</span>' +
       '</div>' +
-    '</div>' +
-    '<div class="gal-toolbar-spacer"></div>';
+    '</div>';
   }
 
   function swipePageHTML() {

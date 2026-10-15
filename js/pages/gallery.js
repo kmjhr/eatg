@@ -57,6 +57,7 @@
       search: '',
       groupMode: 'flat', // 分组模式：flat 平铺 / type 按品类
       sortMode: false,   // 排序模式：长按卡片拖动重新排列（仅平铺视图）
+      sortHistory: [],   // 排序撤销栈：每项 = 一次拖动前的条目 id 顺序
       filterCats: [],    // 品类筛选（多选）：空数组=全部，可同时选多个品类
       galleryCats: [],   // 品类选项（来自数据管理，可增删改）
       swipeMode: false,
@@ -621,6 +622,10 @@
 
   function saveOrder(ordered) {
     if (!ordered.length) return;
+    // 撤销栈：保存拖动前的顺序（currentItems 仍为旧 sort_order）
+    var prev = currentItems().map(function (it) { return it.id; });
+    state.sortHistory.push(prev);
+    if (state.sortHistory.length > 30) state.sortHistory.shift();
     ordered.forEach(function (it, i) { it.sort_order = i; });
     var ops = ordered.map(function (it) { return { action: 'put', store: 'gallery_items', value: it }; });
     S.bulk(['gallery_items'], ops).then(function () {
@@ -631,6 +636,20 @@
       UI.toast('排序保存失败', 'error');
       rerender();
     });
+  }
+
+  /** 撤销：恢复上一次拖动前的顺序（可多次） */
+  function undoSort() {
+    var prev = state.sortHistory.pop();
+    if (!prev || !prev.length) { UI.toast('没有可撤销的操作', 'error'); return; }
+    var idToIt = {};
+    state.items.forEach(function (it) { idToIt[it.id] = it; });
+    prev.forEach(function (id, i) { if (idToIt[id]) idToIt[id].sort_order = i; });
+    var ops = prev.map(function (id) { return { action: 'put', store: 'gallery_items', value: idToIt[id] }; });
+    S.bulk(['gallery_items'], ops).then(function () {
+      UI.toast('已撤销', 'success');
+      rerender();
+    }).catch(function () { UI.toast('撤销失败', 'error'); });
   }
 
   function cancelSortDrag() {
@@ -656,8 +675,11 @@
     if (state.sortMode) {
       // 排序模式：顶栏 fixed 吸顶（始终可见），其余操作收起
       return '<div class="gal-toolbar gal-toolbar--sort">' +
-        '<div class="gal-toolbar-row"><button type="button" class="btn btn--primary" id="gal-sort-done">完成排序</button></div>' +
-        '<p class="gal-swipe-opt-tip" style="text-align:center">长按卡片后拖动换位 · 松手自动保存 · 拖到屏幕上下边缘可滚动</p>' +
+        '<div class="gal-toolbar-row">' +
+          '<button type="button" class="btn btn--secondary" id="gal-sort-undo">撤销</button>' +
+          '<button type="button" class="btn btn--primary" id="gal-sort-done">完成排序</button>' +
+        '</div>' +
+        '<p class="gal-swipe-opt-tip" style="text-align:center">长按卡片后拖动换位 · 松手自动保存 · 可多次撤销 · 拖到屏幕上下边缘可滚动</p>' +
       '</div>' +
       '<div class="gal-sort-spacer"></div>';
     }
@@ -819,6 +841,7 @@
     if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
     state.sortMode = true;
     state.swipeMode = false;
+    state.sortHistory = [];
     state.groupMode = 'flat'; // 排序仅平铺视图
     rerender();
   }
@@ -855,9 +878,12 @@
     var sortBtn = document.getElementById('gal-sort-btn');
     if (sortBtn) pon(sortBtn, 'click', function () { enterSort(); });
     var sortDone = document.getElementById('gal-sort-done');
-    if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; rerender(); });
-    var sortDone = document.getElementById('gal-sort-done');
-    if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; rerender(); });
+    if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; state.sortHistory = []; rerender(); });
+    var undoBtn = document.getElementById('gal-sort-undo');
+    if (undoBtn) {
+      undoBtn.disabled = !state.sortHistory.length;
+      pon(undoBtn, 'click', undoSort);
+    }
     var swBtn = document.getElementById('gal-swipe-btn');
     if (swBtn) pon(swBtn, 'click', function () {
       if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }

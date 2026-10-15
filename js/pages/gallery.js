@@ -654,11 +654,12 @@
 
   function toolbarHTML() {
     if (state.sortMode) {
-      // 排序模式：专注拖动，其余操作收起
-      return '<div class="gal-toolbar">' +
+      // 排序模式：顶栏 fixed 吸顶（始终可见），其余操作收起
+      return '<div class="gal-toolbar gal-toolbar--sort">' +
         '<div class="gal-toolbar-row"><button type="button" class="btn btn--primary" id="gal-sort-done">完成排序</button></div>' +
         '<p class="gal-swipe-opt-tip" style="text-align:center">长按卡片后拖动换位 · 松手自动保存 · 拖到屏幕上下边缘可滚动</p>' +
-      '</div>';
+      '</div>' +
+      '<div class="gal-sort-spacer"></div>';
     }
     return '<div class="gal-toolbar">' +
       '<input id="gal-search" class="input" type="text" placeholder="搜索条目名称" value="' + esc(state.search) + '">' +

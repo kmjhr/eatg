@@ -519,11 +519,13 @@
     return html;
   }
 
-  // ---- 排序模式：长按卡片拖动重新排列（仅平铺视图）----
-  // 拖动排序（v2）：排序模式下按住卡片即候选，移动 >8px 自动激活拖动（免长按）；
-  // 激活后卡片跟手（缩放+阴影），按指针落点实时换位，松手按 DOM 顺序全量写回 sort_order（0..n-1）。
-  // 网格区域 touch-action:none 防抢滚动；拖到屏幕上下边缘自动滚动浏览。
-  var sortState = null; // { row, card, active, startX, startY, moveFn, upFn }
+  // ---- 排序模式：长按卡片激活拖动重新排列（仅平铺视图）----
+  // 拖动排序（v3）：排序模式下长按卡片 350ms 激活拖动（激活时震动反馈），
+  // 未长按前的滑动不触发任何拖动 → 滚动/翻页不会误触；激活后卡片跟手（缩放+阴影），
+  // 按指针落点实时换位，松手按 DOM 顺序全量写回 sort_order（0..n-1）。
+  // 网格区域 touch-action:none 防抢滚动（排序模式专注拖动）；拖到屏幕上下边缘自动滚动浏览。
+  var sortState = null; // { row, card, active, timer, startX, startY, moveFn, upFn }
+  var SORT_HOLD_MS = 350;
 
   function bindSortGrid(page) {
     if (!state.sortMode) return;
@@ -535,26 +537,21 @@
       var card = e.target.closest('.gal-card');
       if (!card || card.parentNode !== row) return;
       var st = {
-        row: row, card: card, active: false,
+        row: row, card: card, active: false, timer: null,
         startX: e.clientX, startY: e.clientY, moveFn: null, upFn: null
       };
       sortState = st;
       st.moveFn = function (ev) {
-        if (sortState !== st || !st.card) return;
+        if (sortState !== st || !st.active) return;
         if (ev.cancelable) ev.preventDefault();
         var dx = ev.clientX - st.startX, dy = ev.clientY - st.startY;
-        if (!st.active) {
-          if (Math.abs(dx) + Math.abs(dy) < 8) return; // 未达阈值视为轻点
-          st.active = true;
-          st.card.classList.add('gal-sort-drag');
-          st.card.style.pointerEvents = 'none';
-        }
         st.card.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.04)';
         swapByPointer(st, ev);
         autoScroll(ev.clientY);
       };
       st.upFn = function () {
         if (sortState === st) sortState = null;
+        if (st.timer) { clearTimeout(st.timer); st.timer = null; }
         document.removeEventListener('pointermove', st.moveFn);
         document.removeEventListener('pointerup', st.upFn);
         document.removeEventListener('pointercancel', st.upFn);
@@ -572,9 +569,17 @@
         }
         saveOrder(ordered);
       };
-      document.addEventListener('pointermove', st.moveFn);
-      document.addEventListener('pointerup', st.upFn);
-      document.addEventListener('pointercancel', st.upFn);
+      // 长按定时器：350ms 后激活拖动（此期间手指滑动/抬起均不触发，页面被锁定不误滚）
+      st.timer = setTimeout(function () {
+        if (sortState !== st || !st.card) { sortState = null; return; }
+        st.active = true;
+        st.card.classList.add('gal-sort-drag');
+        st.card.style.pointerEvents = 'none';
+        if (global.navigator && navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+        document.addEventListener('pointermove', st.moveFn);
+        document.addEventListener('pointerup', st.upFn);
+        document.addEventListener('pointercancel', st.upFn);
+      }, SORT_HOLD_MS);
     });
   }
 
@@ -631,6 +636,7 @@
   function cancelSortDrag() {
     if (!sortState) return;
     var st = sortState;
+    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
     document.removeEventListener('pointermove', st.moveFn);
     document.removeEventListener('pointerup', st.upFn);
     document.removeEventListener('pointercancel', st.upFn);
@@ -651,7 +657,7 @@
       // 排序模式：专注拖动，其余操作收起
       return '<div class="gal-toolbar">' +
         '<div class="gal-toolbar-row"><button type="button" class="btn btn--primary" id="gal-sort-done">完成排序</button></div>' +
-        '<p class="gal-swipe-opt-tip" style="text-align:center">按住卡片拖动换位 · 松手自动保存 · 拖到屏幕上下边缘可滚动</p>' +
+        '<p class="gal-swipe-opt-tip" style="text-align:center">长按卡片后拖动换位 · 松手自动保存 · 拖到屏幕上下边缘可滚动</p>' +
       '</div>';
     }
     return '<div class="gal-toolbar">' +

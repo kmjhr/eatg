@@ -1647,7 +1647,7 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-prog-count .num{font-weight:700;color:var(--accent,#FFDD88)}
 .gal-prog-bar{height:8px;background:var(--fill,#eee);border-radius:999px;overflow:hidden}
 .gal-prog-fill{height:100%;background:var(--accent,#FFDD88);border-radius:999px;transition:width .4s ease}
-.gal-toolbar{display:flex;flex-direction:column;gap:6px;padding:0 12px 8px}
+.gal-toolbar{display:flex;flex-direction:column;gap:6px;padding:0 12px 8px;position:sticky;top:0;z-index:20;background:var(--bg)}
 .gal-toolbar-row{display:flex;gap:8px}
 .gal-toolbar-row .btn{flex:1;min-width:0}
 .gal-toolbar .input{flex:1}

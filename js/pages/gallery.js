@@ -679,7 +679,8 @@
           '<span class="switch-label">点亮模式（点击卡片标记拥有）</span></label>' +
         '<span class="gal-swipe-opt-tip">默认关闭防误触 · 打开后点击卡片 = 点亮/取消</span>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    '<div class="gal-toolbar-spacer"></div>';
   }
 
   function swipePageHTML() {
@@ -708,7 +709,6 @@
       progressHTML() +
       toolbarHTML() +
       gridHTML() +
-      '<button type="button" class="gal-sort-fab" id="gal-sort-fab" aria-label="进入排序">排序</button>' +
     '</div>';
   }
 
@@ -807,10 +807,7 @@
       deck.history = [];
       rebuildDeck();
     } else {
-      page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML() +
-        '<button type="button" class="gal-sort-fab" id="gal-sort-fab" aria-label="进入排序">排序</button>';
-      var fabEl = page.querySelector('#gal-sort-fab');
-      if (fabEl) fabEl.style.display = state.sortMode ? 'none' : 'flex';
+      page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML();
     }
     bindInner();
   }
@@ -858,8 +855,6 @@
     });
     var sortBtn = document.getElementById('gal-sort-btn');
     if (sortBtn) pon(sortBtn, 'click', function () { enterSort(); });
-    var fabBtn = document.getElementById('gal-sort-fab');
-    if (fabBtn) pon(fabBtn, 'click', function () { enterSort(); });
     var sortDone = document.getElementById('gal-sort-done');
     if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; rerender(); });
     var sortDone = document.getElementById('gal-sort-done');

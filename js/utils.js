@@ -165,7 +165,7 @@
   U.compressImage = compressImage;
 
   // ---- 图片编辑器（旋转 + 裁剪，纯 Canvas，无外部依赖） ----
-  // openImageEditor(dataUrl) → Promise<dataUrl|null>（null = 取消/未改动）
+  // openImageEditor(dataUrl) → Promise<dataUrl|null>（null = 取消/跳过；应用但未裁剪时返回原图）
   // 裁剪比例：自由 / 1:1 / 3:4；输出自动压缩到长边 ≤1920、≤约800KB。
 
   function dataUrlToBlob(dataUrl) {
@@ -363,7 +363,7 @@
         });
 
         function doApply() {
-          if (!crop) { finish(null); return; }
+          if (!crop) { finish(src); return; }  // 未裁剪 = 保留原图（确认应用而非取消）
           var css = canvasCss();
           var scaleX = cw / css.w, scaleY = ch / css.h;
           var sx = Math.round(crop.x * scaleX), sy = Math.round(crop.y * scaleY);
@@ -391,6 +391,36 @@
   }
 
   U.openImageEditor = openImageEditor;
+
+  // ---- 拍照/相册导入并逐张编辑（选中照片后先修改，再入列表） ----
+  // importImagesWithEdit(files, opts) → Promise<{added, skipped}>
+  //   每张：压缩 → 弹图片编辑器（旋转/裁剪；应用=采用[未裁剪保留原图]，取消=跳过）→ opts.onEach(dataUrl, idx)
+  function importImagesWithEdit(fileList, opts) {
+    opts = opts || {};
+    var files = Array.prototype.slice.call(fileList || []);
+    var maxCount = opts.maxCount || 9;
+    var take = files.slice(0, maxCount);
+    var result = { added: 0, skipped: 0 };
+    if (!take.length) return Promise.resolve(result);
+    var chain = Promise.resolve();
+    take.forEach(function (file, idx) {
+      chain = chain.then(function () {
+        return U.compressImage(file, {
+          maxEdge: opts.maxEdge || 1920,
+          quality: (opts.quality == null ? 0.8 : opts.quality),
+          stripExif: true
+        }).then(function (compressed) {
+          return U.openImageEditor(compressed).then(function (out) {
+            if (out == null) { result.skipped++; return; }
+            result.added++;
+            if (opts.onEach) opts.onEach(out, idx);
+          });
+        });
+      });
+    });
+    return chain.then(function () { return result; });
+  }
+  U.importImagesWithEdit = importImagesWithEdit;
 
   // ---- 主题切换（P-03 深色模式） ----
   function applyTheme(val) {

@@ -14,7 +14,7 @@
   var UI = EATG.ui;
   var GI = (EATG.galleryImport = EATG.galleryImport || {});
 
-  var DEFAULT_URL = 'https://raw.githubusercontent.com/kmjhr/eatg/main/app/data/gallery_seed_soyo.json';
+  var DEFAULT_URL = 'https://raw.githubusercontent.com/kmjhr/eatg/develop/app/data/gallery_seed_soyo_badges.json';
 
   function esc(s) { return UI.esc(s == null ? '' : String(s)); }
   function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
@@ -61,14 +61,19 @@
           var old = byName[name];
           if (old) {
             skipped++;
-            // 补漏不覆盖：仅当旧条目缺字段时补充只读元数据
+            // 补漏不覆盖：仅当旧条目缺字段时补充只读元数据；
+            // image 例外：清单图（本地图鉴资源）更新时同步换新图（换文件名 v2 后路径不同才生效），
+            // 保护 owned / goods_id 不变。
             var changed = false;
-            var fill = { image: 1, series: 1, goods_type: 1, price_jpy: 1, source: 1, source_url: 1, jp_name: 1, category: 1 };
+            var fill = { series: 1, goods_type: 1, price_jpy: 1, source: 1, source_url: 1, jp_name: 1, category: 1 };
             for (var k in fill) {
               if (!Object.prototype.hasOwnProperty.call(fill, k)) continue;
               if (!old[k] && it[k] != null && it[k] !== '') {
                 old[k] = it[k]; changed = true;
               }
+            }
+            if (it.image && String(it.image).trim() && old.image !== String(it.image).trim()) {
+              old.image = String(it.image).trim(); changed = true;
             }
             if (changed) toUpdate.push(old);
             return;

@@ -726,24 +726,22 @@
     var slots = MAX_IMAGES - state.images.length;
     if (slots <= 0) { UI.toast('最多 ' + MAX_IMAGES + ' 张图片', 'error'); return; }
     var take = files.slice(0, slots);
-    if (files.length > slots) UI.toast('仅添加前 ' + slots + ' 张（上限 ' + MAX_IMAGES + '）', 'error');
-    var quality = (EATG.runtime && EATG.runtime.imageQuality) || 0.8;
-    UI.toast('正在压缩图片…');
-    var chain = Promise.resolve();
-    take.forEach(function (file) {
-      chain = chain.then(function () {
-        return U.compressImage(file, { maxEdge: 1920, quality: quality, stripExif: true }).then(function (dataUrl) {
-          if (state.destroyed) return;
-          state.images.push(dataUrl);
-          renderImages();
-        });
-      });
-    });
-    chain.then(function () {
+    if (files.length > slots) UI.toast('仅处理前 ' + slots + ' 张（上限 ' + MAX_IMAGES + '）', 'error');
+    UI.toast('正在处理图片（可旋转/裁剪）…');
+    U.importImagesWithEdit(take, {
+      maxCount: slots,
+      quality: (EATG.runtime && EATG.runtime.imageQuality) || 0.8,
+      onEach: function (dataUrl) {
+        if (state.destroyed) return;
+        state.images.push(dataUrl);
+        renderImages();
+      }
+    }).then(function (res) {
       if (state.destroyed) return;
-      UI.toast('已添加图片', 'success');
+      if (res.added) UI.toast('已添加 ' + res.added + ' 张' + (res.skipped ? '（跳过 ' + res.skipped + ' 张）' : ''), 'success');
+      else if (res.skipped) UI.toast('未添加图片（已跳过）', 'error');
     }).catch(function (err) {
-      console.error('[EATG] 图片压缩失败', err);
+      console.error('[EATG] 图片处理失败', err);
       UI.toast('图片处理失败：' + (err && err.message || err), 'error');
     });
   }

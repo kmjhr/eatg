@@ -100,9 +100,12 @@
           '<input id="ge-date" class="input" type="date" value="' + esc(it.release_date) + '"></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">图片</label></div>' +
           '<div class="ge-img-row">' +
-            (it.image ? '<img class="ge-img" src="' + esc(it.image) + '">' : '<div class="ge-img ge-img--ph">无图</div>') +
-            '<span class="btn btn--secondary" id="ge-img-btn" style="position:relative">选择图片' +
-              '<input type="file" id="ge-img-input" class="input-cover" accept="image/*"></span>' +
+            (it.image ? '<img class="ge-img" id="ge-img-view" src="' + esc(it.image) + '" alt="条目图">' : '<div class="ge-img ge-img--ph">无图</div>') +
+            '<span class="btn btn--secondary ge-img-file" style="position:relative">拍照' +
+              '<input type="file" id="ge-img-cam" class="input-cover" accept="image/*" capture="environment"></span>' +
+            '<span class="btn btn--secondary ge-img-file" style="position:relative">相册' +
+              '<input type="file" id="ge-img-album" class="input-cover" accept="image/*"></span>' +
+            (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-edit">编辑</button>' : '') +
             (it.image ? '<button type="button" class="btn btn--secondary" id="ge-img-clear">清除</button>' : '') +
           '</div></div>' +
         '<div class="field"><div class="field-head"><label class="field-label">关联谷子款（可选）</label></div>' +
@@ -129,31 +132,55 @@
     dom.date = p.querySelector('#ge-date');
     dom.goods = p.querySelector('#ge-goods');
     dom.owned = p.querySelector('#ge-owned');
-    dom.imgBtn = p.querySelector('#ge-img-btn');
-    dom.imgInput = p.querySelector('#ge-img-input');
+    dom.imgView = p.querySelector('#ge-img-view');
+    dom.imgCam = p.querySelector('#ge-img-cam');
+    dom.imgAlbum = p.querySelector('#ge-img-album');
+    dom.imgEdit = p.querySelector('#ge-img-edit');
     dom.imgClear = p.querySelector('#ge-img-clear');
   }
 
   function bind(ctx) {
-    // 图片选择：input 覆盖按钮真实触摸；覆盖失效时点击按钮兜底 JS click（两路互斥）
-    on(dom.imgBtn, 'click', function (e) {
-      if (e.target === dom.imgInput) return;
-      try { dom.imgInput.click(); } catch (err) { console.error('[EATG] 图鉴选图兜底失败', err); }
-    });
-    on(dom.imgInput, 'change', function () {
-      var f = dom.imgInput.files[0];
-      if (!f) return;
-      U.compressImage(f, { maxEdge: 600, quality: 0.8 }).then(function (b64) {
-        state.item.image = b64;
-        rerender();
-      }).catch(function () { UI.toast('图片处理失败', 'error'); });
-    });
+    // 拍照/相册：选中照片后先弹编辑器（旋转/裁剪）确认再替换
+    on(dom.imgCam, 'change', function () { pickAndEdit(dom.imgCam); });
+    on(dom.imgAlbum, 'change', function () { pickAndEdit(dom.imgAlbum); });
+    if (dom.imgView) on(dom.imgView, 'click', function () { openEdit(); });
+    if (dom.imgEdit) on(dom.imgEdit, 'click', function () { openEdit(); });
     if (dom.imgClear) on(dom.imgClear, 'click', function () { state.item.image = ''; rerender(); });
     on(dom.page, 'click', function (e) {
       var act = e.target.closest('[data-act]');
       if (!act) return;
       if (act.dataset.act === 'save') doSave(ctx);
       else if (act.dataset.act === 'del') doDel(ctx);
+    });
+  }
+
+  /** 选中照片后先编辑（旋转/裁剪）再替换条目图；取消=保留原图 */
+  function pickAndEdit(inputEl) {
+    var f = inputEl.files[0];
+    inputEl.value = '';
+    if (!f) return;
+    UI.toast('正在处理图片…');
+    U.importImagesWithEdit([f], {
+      maxCount: 1,
+      maxEdge: 900,
+      onEach: function (dataUrl) { state.item.image = dataUrl; }
+    }).then(function (res) {
+      if (state.destroyed) return;
+      if (res.added) { UI.toast('图片已更新', 'success'); rerender(); }
+      else UI.toast('未选择图片', 'error');
+    }).catch(function (err) { UI.toast('图片处理失败：' + (err && err.message || err), 'error'); });
+  }
+
+  /** 点击条目图/编辑按钮：打开编辑器修改现有图片 */
+  function openEdit() {
+    var src = state.item.image;
+    if (!src) return;
+    if (!U.openImageEditor) { UI.toast('图片编辑暂不可用', 'error'); return; }
+    U.openImageEditor(src).then(function (out) {
+      if (state.destroyed || out == null) return;
+      state.item.image = out;
+      rerender();
+      UI.toast('图片已更新', 'success');
     });
   }
 

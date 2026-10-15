@@ -392,6 +392,57 @@
 
   U.openImageEditor = openImageEditor;
 
+  // ---- 图鉴角色去重合并（修复历史重复数据：同名图鉴角色合并到保留者） ----
+  // 仅处理 gallery!==false 的图鉴角色；同名重复者合并 is_favorite/ip 到第一个，
+  // gallery_items.character_id 重映射到保留角色，删除重复角色记录。
+  // 幂等：一次会话只执行一次（成功后才置 done）。
+  U.dedupeGalleryChars = (function () {
+    var done = false;
+    function run() {
+      if (done) return Promise.resolve({ merged: 0 });
+      var S = EATG.storage;
+      if (!S || !S.getAll || !S.bulk) return Promise.resolve({ merged: 0 });
+      return S.getAll('characters').then(function (chars) {
+        var gal = (chars || []).filter(function (c) { return c && c.gallery !== false; });
+        var keepByKey = {}, keepById = {}, dupToKeep = {};
+        gal.forEach(function (c) {
+          var key = String(c.name || '').trim();
+          if (!key) return;
+          if (!keepByKey[key]) { keepByKey[key] = c; keepById[c.id] = c; return; }
+          dupToKeep[c.id] = keepByKey[key].id;
+        });
+        var dupIds = Object.keys(dupToKeep).map(Number);
+        if (!dupIds.length) return { merged: 0 };
+        return S.getAll('gallery_items').then(function (items) {
+          var ops = [];
+          (items || []).forEach(function (it) {
+            var nid = dupToKeep[it.character_id];
+            if (nid == null) return;
+            it.character_id = nid;
+            ops.push({ action: 'put', store: 'gallery_items', value: it });
+          });
+          var keepChanged = {};
+          dupIds.forEach(function (dupId) {
+            var keep = keepById[dupToKeep[dupId]];
+            var dup = gal.filter(function (c) { return c.id === dupId; })[0];
+            if (!keep || !dup) return;
+            if (dup.is_favorite && !keep.is_favorite) { keep.is_favorite = true; keepChanged[keep.id] = 1; }
+            if (!keep.ip && dup.ip) { keep.ip = dup.ip; keepChanged[keep.id] = 1; }
+            ops.push({ action: 'del', store: 'characters', key: dupId });
+          });
+          Object.keys(keepChanged).forEach(function (kid) {
+            ops.push({ action: 'put', store: 'characters', value: keepById[Number(kid)] });
+          });
+          if (!ops.length) return { merged: dupIds.length };
+          return S.bulk(['characters', 'gallery_items'], ops).then(function () {
+            return { merged: dupIds.length };
+          });
+        });
+      }).then(function (r) { done = true; return r; });
+    }
+    return run;
+  })();
+
   // ---- 拍照/相册导入并逐张编辑（选中照片后先修改，再入列表） ----
   // importImagesWithEdit(files, opts) → Promise<{added, skipped}>
   //   每张：压缩 → 弹图片编辑器（旋转/裁剪；应用=采用[未裁剪保留原图]，取消=跳过）→ opts.onEach(dataUrl, idx)

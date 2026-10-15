@@ -111,11 +111,20 @@
         (state.purchasesByGoods[p.goods_id] = state.purchasesByGoods[p.goods_id] || []).push(p);
       });
       state.galleryCats = (Array.isArray(r[4]) && r[4].length) ? r[4] : DEFAULT_GALLERY_CATS.slice();
-      // 默认选中：自推优先，否则第一个
-      if (!state.currentCharId || !state.characters.some(function (c) { return c.id === state.currentCharId; })) {
-        var fav = state.characters.filter(function (c) { return c.is_favorite; })[0];
-        state.currentCharId = (fav || state.characters[0] || {}).id || null;
-      }
+      // 自动修复：同名图鉴角色去重合并（历史重复数据）
+      return U.dedupeGalleryChars().then(function (res) {
+        if (res && res.merged) {
+          return S.getAll('characters').then(function (chars2) {
+            state.characters = (chars2 || []).filter(function (c) { return c.gallery !== false; });
+          });
+        }
+      }).then(function () {
+        // 默认选中：自推优先，否则第一个
+        if (!state.currentCharId || !state.characters.some(function (c) { return c.id === state.currentCharId; })) {
+          var fav = state.characters.filter(function (c) { return c.is_favorite; })[0];
+          state.currentCharId = (fav || state.characters[0] || {}).id || null;
+        }
+      });
     });
   }
 

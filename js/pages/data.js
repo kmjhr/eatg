@@ -106,6 +106,17 @@
       state.characters = r[3] || [];
       state.galleryItems = r[4] || [];
       state.galleryCats = (Array.isArray(r[5]) && r[5].length) ? r[5] : EATG.DEFAULT_GALLERY_CATS.slice();
+      // 自动修复：同名图鉴角色去重合并
+      return U.dedupeGalleryChars().then(function (res) {
+        if (res && res.merged) {
+          return S.getAll('characters').then(function (chars2) {
+            state.characters = chars2 || [];
+            state.galleryItems = (state.galleryItems || []).map(function (it) {
+              return it;
+            });
+          });
+        }
+      });
     });
   }
 

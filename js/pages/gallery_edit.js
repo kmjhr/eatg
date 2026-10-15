@@ -55,6 +55,17 @@
       state.mode = 'add';
       if (cid) state.item.character_id = Number(cid);
       else if (state.characters[0]) state.item.character_id = state.characters[0].id;
+      // 自动修复：同名图鉴角色去重合并后重载角色列表
+      return U.dedupeGalleryChars().then(function (res) {
+        if (res && res.merged) {
+          return S.getAll('characters').then(function (chars2) {
+            state.characters = (chars2 || []).filter(function (c) { return c.gallery !== false; });
+            if (cid && !state.characters.some(function (c) { return c.id === Number(cid); })) {
+              state.item.character_id = state.characters[0] ? state.characters[0].id : null;
+            }
+          });
+        }
+      });
     });
   }
 

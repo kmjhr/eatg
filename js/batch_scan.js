@@ -215,6 +215,28 @@
     img.src = url;
   }
 
+  /** 编辑后的 dataUrl 加载进画布（与 loadFile 相同流程） */
+  function loadDataUrl(dataUrl) {
+    if (!dataUrl || !view || view.destroyed) return;
+    var img = new Image();
+    img.onload = function () {
+      if (view && view.destroyed) return;
+      view.img = img;
+      view.fit = fitRect(img.naturalWidth, img.naturalHeight, view.canvas.clientWidth, view.canvas.clientHeight);
+      view.canvas.width = view.canvas.clientWidth;
+      view.canvas.height = view.canvas.clientHeight;
+      view.boxes = [];
+      view.sel = -1;
+      var empty = view.el.querySelector('.bs-empty');
+      if (empty) empty.style.display = 'none';
+      var opts = view.el.querySelector('.bs-pick-options');
+      if (opts) opts.style.display = 'none';
+      draw();
+    };
+    img.onerror = function () { UI.toast('图片读取失败', 'error'); };
+    img.src = dataUrl;
+  }
+
   function showPickOptions() {
     if (!view || view.destroyed) return;
     var opts = view.el.querySelector('.bs-pick-options');
@@ -235,7 +257,21 @@
       opts.addEventListener('change', function (e) {
         var inp = e.target.closest('input[type=file]');
         if (!inp) return;
-        loadFile(inp.files && inp.files[0]);
+        var file = inp.files && inp.files[0];
+        inp.value = '';
+        if (!file) return;
+        UI.toast('正在处理图片（可旋转/裁剪）…');
+        U.importImagesWithEdit([file], {
+          maxCount: 1,
+          maxEdge: 1920,
+          quality: (EATG.runtime && EATG.runtime.imageQuality) || 0.8,
+          onEach: function (dataUrl) { loadDataUrl(dataUrl); }
+        }).then(function (res) {
+          if (!res.added) UI.toast('未选择图片', 'error');
+        }).catch(function (err) {
+          console.error('[EATG] 批量录入选图处理失败', err);
+          UI.toast('图片处理失败：' + (err && err.message || err), 'error');
+        });
       });
       opts.addEventListener('click', function (e) {
         var row = e.target.closest('.opt-row--file');

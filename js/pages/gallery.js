@@ -707,6 +707,7 @@
       progressHTML() +
       toolbarHTML() +
       gridHTML() +
+      '<button type="button" class="gal-sort-fab" id="gal-sort-fab" aria-label="进入排序">排序</button>' +
     '</div>';
   }
 
@@ -805,13 +806,24 @@
       deck.history = [];
       rebuildDeck();
     } else {
-      page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML();
+      page.innerHTML = charScrollHTML() + progressHTML() + toolbarHTML() + gridHTML() +
+        '<button type="button" class="gal-sort-fab" id="gal-sort-fab" aria-label="进入排序">排序</button>';
+      var fabEl = page.querySelector('#gal-sort-fab');
+      if (fabEl) fabEl.style.display = state.sortMode ? 'none' : 'flex';
     }
     bindInner();
   }
 
   function reload() {
     return load().then(function () { if (!state.destroyed) rerender(); });
+  }
+
+  function enterSort() {
+    if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
+    state.sortMode = true;
+    state.swipeMode = false;
+    state.groupMode = 'flat'; // 排序仅平铺视图
+    rerender();
   }
 
   function bindInner() {
@@ -844,12 +856,11 @@
       }
     });
     var sortBtn = document.getElementById('gal-sort-btn');
-    if (sortBtn) pon(sortBtn, 'click', function () {
-      if (!state.currentCharId) { UI.toast('请先选择或添加角色', 'error'); return; }
-      state.sortMode = true;
-      state.groupMode = 'flat'; // 排序仅平铺视图
-      rerender();
-    });
+    if (sortBtn) pon(sortBtn, 'click', function () { enterSort(); });
+    var fabBtn = document.getElementById('gal-sort-fab');
+    if (fabBtn) pon(fabBtn, 'click', function () { enterSort(); });
+    var sortDone = document.getElementById('gal-sort-done');
+    if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; rerender(); });
     var sortDone = document.getElementById('gal-sort-done');
     if (sortDone) pon(sortDone, 'click', function () { state.sortMode = false; rerender(); });
     var swBtn = document.getElementById('gal-swipe-btn');

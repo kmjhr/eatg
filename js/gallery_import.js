@@ -63,7 +63,7 @@
             skipped++;
             // 补漏不覆盖：仅当旧条目缺字段时补充只读元数据
             var changed = false;
-            var fill = { image: 1, series: 1, goods_type: 1, price_jpy: 1, source: 1, source_url: 1, jp_name: 1 };
+            var fill = { image: 1, series: 1, goods_type: 1, price_jpy: 1, source: 1, source_url: 1, jp_name: 1, category: 1 };
             for (var k in fill) {
               if (!Object.prototype.hasOwnProperty.call(fill, k)) continue;
               if (!old[k] && it[k] != null && it[k] !== '') {
@@ -79,6 +79,7 @@
             name: name,
             series: String(it.series || '').trim() || '',
             release_date: String(it.release_date || '').trim() || '',
+            category: String(it.category || '').trim() || '',
             goods_type: String(it.goods_type || '').trim() || '',
             price_jpy: num(it.price_jpy) || 0,
             source: String(it.source || '').trim() || '',

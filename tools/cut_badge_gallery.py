@@ -78,7 +78,7 @@ def main():
                 c['name'] += '(2)'
             c.pop('seq', None)
         items = [{
-            'name': c['name'], 'goods_type': '吧唧', 'series': '', 'release_date': '',
+            'name': c['name'], 'goods_type': '吧唧', 'category': '吧唧', 'series': '', 'release_date': '',
             'price_jpy': 0, 'status': '', 'source': '葉羽图鉴', 'image': c['img'],
             'source_url': '', 'jp_name': ''
         } for c in cells]

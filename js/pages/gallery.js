@@ -140,54 +140,6 @@
     return state.characters.filter(function (c) { return c.id === state.currentCharId; })[0] || null;
   }
 
-  // ---- 谷子库 → 图鉴 自动同步（《业务规则》§9 扩展）----
-  // 谷子库中存在且关联了当前角色的谷子，若图鉴无同名条目则自动添加并关联 goods_id，
-  // 拥有状态由 computeItemState 按谷子购入状态自动判定（现货→点亮，预售/在途→半亮）。
-  // 只添加不存在的条目，不覆盖既有标记。
-  function syncFromGoods() {
-    var c = currentChar();
-    if (!c) return Promise.resolve(0);
-    return S.getAll('goods').then(function (goods) {
-      return S.getAll('gallery_items').then(function (items) {
-        var byName = {};
-        items.forEach(function (it) {
-          if (it.character_id === c.id) byName[String(it.name || '')] = true;
-        });
-        var toAdd = [];
-        goods.forEach(function (g) {
-          var cids = g.character_ids || [];
-          var hit = false;
-          for (var i = 0; i < cids.length; i++) {
-            if (Number(cids[i]) === c.id) { hit = true; break; }
-          }
-          if (!hit) return;
-          var nm = String(g.name || '').trim();
-          if (!nm || byName[nm]) return;
-          byName[nm] = true;
-          toAdd.push({
-            character_id: c.id,
-            name: g.name,
-            goods_type: String(g.goods_type || '').trim() || '',
-            image: (g.images && g.images[0]) ? g.images[0] : '',
-            goods_id: g.id,
-            owned: false,
-            series: '',
-            release_date: ''
-          });
-        });
-        if (!toAdd.length) return Promise.resolve(0);
-        var i = 0;
-        function next() {
-          if (i >= toAdd.length) return Promise.resolve(toAdd.length);
-          var batch = toAdd.slice(i, i + 50);
-          i += 50;
-          return Promise.all(batch.map(function (v) { return S.add('gallery_items', v); })).then(next);
-        }
-        return next();
-      });
-    });
-  }
-
   // ---- 进度 ----
   function progress(items) {
     var owned = 0, total = items.length;
@@ -961,13 +913,6 @@
       if (state.destroyed) return;
       container.innerHTML = pageHTML();
       bindInner();
-      // 谷子库 → 图鉴 自动同步（打开图鉴页即执行，幂等）
-      syncFromGoods().then(function (n) {
-        if (n && !state.destroyed) {
-          UI.toast('已从谷子库自动添加 ' + n + ' 条图鉴', 'success');
-          rerender();
-        }
-      });
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 图鉴加载失败', err);

@@ -260,6 +260,40 @@
     });
   }
 
+  /** 底部导航：横向滑动切换 Tab（放大镜切换） */
+  function initTabSwipe() {
+    var bar = dom.tabBar;
+    if (!bar) return;
+    var startX = null, startY = null, startRoute = null;
+    bar.addEventListener('touchstart', function (e) {
+      var t = e.touches && e.touches[0];
+      if (!t) return;
+      startX = t.clientX; startY = t.clientY;
+      startRoute = parseHash().segments[0] || DEFAULT_ROUTE;
+    }, { passive: true });
+    bar.addEventListener('touchmove', function (e) {
+      if (startX === null) return;
+      var t = e.touches && e.touches[0];
+      if (!t) return;
+      var cx = t.clientX - startX, cy = t.clientY - startY;
+      if (Math.abs(cy) > Math.abs(cx) * 1.2) return;   // 竖向滚动不拦截
+      e.preventDefault();
+    }, { passive: false });
+    bar.addEventListener('touchend', function (e) {
+      if (startX === null) return;
+      var t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      var cx = t.clientX - startX, cy = t.clientY - startY;
+      startX = startY = null;
+      if (Math.abs(cx) < 40 || Math.abs(cy) > Math.abs(cx)) return;
+      var idx = TAB_ROUTES.indexOf(startRoute);
+      if (idx < 0) return;
+      var next = cx < 0 ? idx + 1 : idx - 1;   // 左滑=下一个
+      if (next < 0 || next >= TAB_ROUTES.length) return;
+      navigate('#/' + TAB_ROUTES[next]);
+    }, { passive: true });
+  }
+
   function boot() {
     if (booted) return;
     booted = true;
@@ -270,6 +304,7 @@
     dom.navBack = document.getElementById('nav-back');
     dom.navActions = document.getElementById('nav-actions');
     dom.tabBar = document.getElementById('tab-bar');
+    initTabSwipe();
     dom.pageContainer = document.getElementById('page-container');
 
     createBackupBanner();

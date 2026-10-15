@@ -40,12 +40,13 @@
       var c = null;
       if (charName) {
         for (var i = 0; i < chars.length; i++) {
-          if ((chars[i].name || '') === charName) { c = chars[i]; break; }
+          // 只匹配图鉴角色（gallery!==false）；谷子侧同名角色不占用图鉴角色
+          if ((chars[i].name || '') === charName && chars[i].gallery !== false) { c = chars[i]; break; }
         }
       }
       if (c) return c;
-      // 角色不存在 → 自动创建
-      return S.add('characters', { name: charName || '未命名角色', ip: ip, is_favorite: chars.length === 0 })
+      // 图鉴角色不存在 → 自动创建（gallery=true），不挂到谷子角色下
+      return S.add('characters', { name: charName || '未命名角色', ip: ip, is_favorite: chars.length === 0, gallery: true })
         .then(function (id) { return { id: Number(id), name: charName }; });
     }).then(function (c) {
       return S.getAll('gallery_items').then(function (existing) {

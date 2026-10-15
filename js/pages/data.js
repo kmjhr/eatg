@@ -391,7 +391,8 @@
     var input = document.getElementById('char-add');
     var v = input ? input.value.trim() : '';
     if (!v) { UI.toast('请输入角色名', 'error'); return; }
-    if (state.characters.some(function (c) { return c.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
+    // 谷子角色查重只限谷子侧（图鉴人物同名不挡）
+    if (state.characters.some(function (c) { return c.name === v && c.gallery === false; })) { UI.toast('该谷子角色已存在', 'error'); return; }
     S.add('characters', { name: v, ip: '其他', is_favorite: false, gallery: false }).then(function (id) {
       state.characters.push({ id: Number(id), name: v, ip: '其他', is_favorite: false, gallery: false });
       UI.toast('已添加谷子角色', 'success'); rerender();
@@ -462,7 +463,8 @@
     var input = document.getElementById('gal-add');
     var v = input ? input.value.trim() : '';
     if (!v) { UI.toast('请输入角色名', 'error'); return; }
-    if (state.characters.some(function (c) { return c.name === v; })) { UI.toast('该角色已存在', 'error'); return; }
+    // 图鉴人物与谷子角色分开管理：同名仅存在谷子角色/已删图鉴时，允许新建图鉴人物
+    if (state.characters.some(function (c) { return c.name === v && c.gallery !== false; })) { UI.toast('该图鉴人物已存在', 'error'); return; }
     S.add('characters', { name: v, ip: '其他', is_favorite: false, gallery: true }).then(function (id) {
       state.characters.push({ id: Number(id), name: v, ip: '其他', is_favorite: false, gallery: true });
       UI.toast('已添加图鉴人物', 'success'); rerender();
@@ -490,7 +492,7 @@
       var name = nameInput ? nameInput.value.trim() : '';
       var ip = (ref.body.querySelector('#gal-edit-ip') || {}).value || '';
       if (!name) { UI.toast('内容不能为空', 'error'); return; }
-      if (state.characters.some(function (x) { return x.id !== c.id && x.name === name; })) { UI.toast('该角色已存在', 'error'); return; }
+      if (state.characters.some(function (x) { return x.id !== c.id && x.name === name && x.gallery !== false; })) { UI.toast('该图鉴人物已存在', 'error'); return; }
       c.name = name;
       c.ip = ip.trim();
       S.put('characters', c).then(function () { UI.toast('已保存', 'success'); ref.close(); rerender(); })
@@ -509,14 +511,25 @@
       danger: true
     }).then(function (ok) {
       if (!ok) return;
-      c.gallery = false;
-      S.put('characters', c).then(function () {
+      var removeItems = function () {
         return S.getAll('gallery_items').then(function (items) {
           var dels = (items || []).filter(function (it) { return it.character_id === c.id; });
           var p = Promise.resolve();
           dels.forEach(function (it) { p = p.then(function () { return S.del('gallery_items', it.id); }); });
           return p;
         });
+      };
+      return S.getAll('goods').then(function (goods) {
+        var used = (goods || []).some(function (g) { return (g.character_ids || []).indexOf(Number(c.id)) !== -1; });
+        if (!used) {
+          // 无谷子引用：真删角色记录，重建同名图鉴人物时无冲突、无重复
+          return S.del('characters', c.id).then(function () {
+            state.characters = state.characters.filter(function (x) { return x.id !== c.id; });
+            return removeItems();
+          });
+        }
+        c.gallery = false;
+        return S.put('characters', c).then(removeItems);
       }).then(function () {
         UI.toast('已删除「' + c.name + '」（谷子记录保留）', 'success');
         rerender();

@@ -2,7 +2,8 @@
 """一咕 · 图鉴网格切格工具（素世吧唧全图鉴等「一格一徽章」总览图 → 图鉴种子）
 
 用法：
-  python tools/cut_badge_gallery.py --src <新版图路径> --out-dir <输出目录> [--json <种子json路径>]
+  python tools/cut_badge_gallery.py --src <新版图路径> --out-dir <输出目录> [--json <种子json路径>] [--category <品类>]
+  品类默认「吧唧」；切其他品类图鉴（如立牌）时传 --category 立牌，导入数据即带该品类
 
 流程（未来更新图时重跑）：
   1. 用 Read 读新图 → 目测/OCR 得到每行徽章名称标签的 y 位置（千分比）→ 更新下方 LABEL_Y 与 ROWS
@@ -49,6 +50,7 @@ def main():
     ap.add_argument('--src', required=True)
     ap.add_argument('--out-dir', required=True)
     ap.add_argument('--json', default='')
+    ap.add_argument('--category', default='吧唧', help='图鉴品类（默认吧唧），切非吧唧图时按实际品类传')
     args = ap.parse_args()
 
     img = cv2.imread(args.src, cv2.IMREAD_UNCHANGED)[:, :, :3]
@@ -78,7 +80,7 @@ def main():
                 c['name'] += '(2)'
             c.pop('seq', None)
         items = [{
-            'name': c['name'], 'goods_type': '吧唧', 'category': '吧唧', 'series': '', 'release_date': '',
+            'name': c['name'], 'goods_type': args.category, 'category': args.category, 'series': '', 'release_date': '',
             'price_jpy': 0, 'status': '', 'source': '葉羽图鉴', 'image': c['img'],
             'source_url': '', 'jp_name': ''
         } for c in cells]

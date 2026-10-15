@@ -41,7 +41,8 @@
     var id = params.get('id');
     var cid = params.get('character_id');
     return Promise.all([S.getAll('characters'), S.getAll('goods'), S.getSetting('galleryCats')]).then(function (r) {
-      state.characters = r[0] || [];
+      // 图鉴角色独立：只显示 gallery!==false 的角色（谷子侧角色不进图鉴所属角色列表）
+      state.characters = (r[0] || []).filter(function (c) { return c.gallery !== false; });
       state.goods = r[1] || [];
       state.galleryCats = (Array.isArray(r[2]) && r[2].length) ? r[2] : EATG.DEFAULT_GALLERY_CATS.slice();
       if (id) {

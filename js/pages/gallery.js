@@ -4,12 +4,12 @@
    路由：#/gallery
    内容：1 角色横滑条（默认素世）+ 右上添加角色
         2 进度区（头像/名称/IP/已拥有数/总数/进度条 --accent）
-        3 两列图鉴网格：三态卡片（已拥有亮显+角标 / 已拥有未出荷半亮+状态角标 / 未拥有灰剪影）
-        4 自动点亮：关联 goods 任一购入 on_hand → owned（覆盖手动值）；预售/在途 → 半亮
+        3 两列图鉴网格：已拥有亮显+角标 / 未拥有灰剪影（点亮/熄灭纯手动，谷子购买记录不自动控制）
+        4 谷子状态徽标（现货在手/预售在途/丢失损坏）仅作信息展示，不改变点亮状态
         5 条目点击：详情 + “去收藏库补录”（预填角色跳新增页）+ 手动切换拥有
         6 点亮动画 300ms（grayscale→color）
         7 刷卡模式：卡片堆叠 + 左右翻卡（右滑标记拥有 / 左滑跳过，惯性甩出 + 弹簧回弹 + 上一步撤销）
-   口径：三态判定见 computeItemState；金额无关。
+   口径：点亮状态见 computeItemState（仅 item.owned）；金额无关。
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -23,7 +23,7 @@
 
   var STATUS_LABELS = {
     deposit_pre: '定尾预售', full_pre: '全款预售', shipping: '在途',
-    on_hand: '现货在手', sold_out: '已出荷'
+    on_hand: '现货在手', sold_out: '已出荷', lost: '丢失/损坏'
   };
 
   // 图鉴品类选项：来自数据管理「品类选项」（可增删改，settings.galleryCats）；
@@ -71,26 +71,31 @@
    * @returns { state: 'owned'|'half'|'none', status: string|null, goodsName: string|null }
    */
   function computeItemState(item) {
+    // 点亮/熄灭完全由用户手动（item.owned）；谷子购买记录不自动点亮/熄灭。
+    // status 仅作展示徽标：现货在手 → 预售/在途（取最靠前）→ 丢失/损坏 → 无
     var gid = item.goods_id;
+    var status = null;
+    var goodsName = null;
     if (gid && state.goodsById[gid]) {
-      var g = state.goodsById[gid];
+      goodsName = state.goodsById[gid].name;
       var ps = state.purchasesByGoods[gid] || [];
       var hasOnHand = ps.some(function (p) { return p.status === 'on_hand'; });
-      if (hasOnHand) return { state: 'owned', status: 'on_hand', goodsName: g.name };
-      var preShip = ps.filter(function (p) {
-        return p.status === 'deposit_pre' || p.status === 'full_pre' || p.status === 'shipping';
-      });
-      if (preShip.length) {
-        // 取最靠前（最待办）的状态
-        var rank = { deposit_pre: 0, full_pre: 1, shipping: 2 };
-        preShip.sort(function (a, b) { return rank[a.status] - rank[b.status]; });
-        return { state: 'half', status: preShip[0].status, goodsName: g.name };
+      if (hasOnHand) {
+        status = 'on_hand';
+      } else {
+        var preShip = ps.filter(function (p) {
+          return p.status === 'deposit_pre' || p.status === 'full_pre' || p.status === 'shipping';
+        });
+        if (preShip.length) {
+          var rank = { deposit_pre: 0, full_pre: 1, shipping: 2 };
+          preShip.sort(function (a, b) { return rank[a.status] - rank[b.status]; });
+          status = preShip[0].status;
+        } else if (ps.some(function (p) { return p.status === 'lost'; })) {
+          status = 'lost';
+        }
       }
-      // 全部 sold_out 或无购入：视为未拥有
-      return { state: 'none', status: null, goodsName: g.name };
     }
-    // 无关联 goods：以手动 owned 为准
-    return { state: item.owned ? 'owned' : 'none', status: null, goodsName: null };
+    return { state: item.owned ? 'owned' : 'none', status: status, goodsName: goodsName };
   }
 
   // ---- 数据加载 ----
@@ -194,7 +199,7 @@
     var img = it.image ? 'background-image:url(' + esc(it.image) + ')' : '';
     var badge = '';
     if (st.state === 'owned') badge = '<span class="gal-badge gal-badge--owned">拥有</span>';
-    else if (st.state === 'half') badge = '<span class="gal-badge gal-badge--' + st.status + '">' + esc(STATUS_LABELS[st.status] || st.status) + '</span>';
+    else if (st.status) badge = '<span class="gal-badge gal-badge--' + st.status + '">' + esc(STATUS_LABELS[st.status] || st.status) + '</span>';
     var nameCls = st.state === 'none' ? 'gal-deck-name is-muted' : 'gal-deck-name';
     return '<div class="gal-deck-card gal-card--' + st.state + (layer === 0 ? ' is-top' : '') + '" data-iid="' + it.id + '">' +
       '<div class="gal-deck-img" style="' + img + '">' + badge +
@@ -463,7 +468,7 @@
     var img = it.image ? 'background-image:url(' + esc(it.image) + ')' : '';
     var badge = '';
     if (st.state === 'owned') badge = '<span class="gal-badge gal-badge--owned">拥有</span>';
-    else if (st.state === 'half') badge = '<span class="gal-badge gal-badge--' + st.status + '">' + esc(STATUS_LABELS[st.status] || st.status) + '</span>';
+    else if (st.status) badge = '<span class="gal-badge gal-badge--' + st.status + '">' + esc(STATUS_LABELS[st.status] || st.status) + '</span>';
     var nameCls = st.state === 'none' ? 'gal-card-name is-muted' : 'gal-card-name';
     var stateCls = 'gal-card--' + st.state + (state.sortMode ? ' is-sortable' : '');
     return '<div class="gal-card ' + stateCls + '" data-iid="' + it.id + '">' +
@@ -738,7 +743,7 @@
     var st = computeItemState(item);
     var c = state.characters.filter(function (ch) { return ch.id === item.character_id; })[0];
     var goodsInfo = st.goodsName ? ('关联谷子：' + st.goodsName) : '未关联谷子款';
-    var stateText = st.state === 'owned' ? '已拥有（亮显）' : (st.state === 'half' ? '已拥有未出荷（' + (STATUS_LABELS[st.status] || '') + '）' : '未拥有');
+    var stateText = st.state === 'owned' ? '已拥有（亮显）' : (st.status ? '未点亮 · 谷子状态：' + (STATUS_LABELS[st.status] || st.status) : '未拥有');
     var body = '<div class="gal-detail">' +
       (item.image ? '<img class="gal-detail-img" src="' + esc(item.image) + '">' : '<div class="gal-detail-img gal-detail-img--ph">无图</div>') +
       '<div class="gal-detail-name">' + esc(item.name) + '</div>' +

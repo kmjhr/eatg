@@ -210,7 +210,8 @@
     var cells = [
       { label: '总件数', value: String(s.total_qty), title: '购入累计件数' },
       { label: '卖出', value: String(s.total_sold), title: '实收 ' + money(s.total_net) },
-      { label: '在手', value: String(s.net_qty), title: '总件数 − 卖出 = ' + s.total_qty + ' − ' + s.total_sold + '；现货 ' + s.on_hand + ' · 在途 ' + s.in_transit },
+      { label: '在手', value: String(s.net_qty), title: '总件数 − 卖出 − 丢失 = ' + s.total_qty + ' − ' + s.total_sold + (s.lost_qty ? ' − ' + s.lost_qty : '') + '；现货 ' + s.on_hand + ' · 在途 ' + s.in_transit },
+      { label: '丢失', value: String(s.lost_qty), title: s.lost_loss > 0 ? ('损失 ' + money(s.lost_loss) + '（总投入不变）') : '丢失件数' },
       { label: '总投入', value: money(num(s.filled_cost) + num(s.estimated_cost)),
         title: num(s.order_unalloc) > 0 ? ('含订单未核销支出 ' + money(s.order_unalloc)) : '' },
       { label: '总盈利', value: money(s.total_profit), cls: s.total_profit > 0 ? 'up' : (s.total_profit < 0 ? 'down' : '') },
@@ -336,7 +337,7 @@
   }
 
   function canQuick(status) {
-    return !!status && status !== 'sold_out';
+    return !!status && status !== 'sold_out' && status !== 'lost';
   }
 
   function profitCellHTML(agg) {
@@ -702,7 +703,7 @@
   }
 
   function openStatusSheet(title, onPick) {
-    var bodyHTML = '<div class="chip-select">' + A.STATUS_ORDER.map(function (s) {
+    var bodyHTML = '<div class="chip-select">' + A.STATUS_ORDER.filter(function (s) { return s !== 'lost'; }).map(function (s) {
       return '<button type="button" class="opt-chip" data-status="' + s + '">' + UI.esc(A.STATUS_LABELS[s]) + '</button>';
     }).join('') + '</div>';
     var ref = UI.sheet({ title: title, bodyHTML: bodyHTML });

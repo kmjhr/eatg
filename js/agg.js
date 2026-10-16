@@ -17,11 +17,11 @@
   var A = (EATG.agg = EATG.agg || {});
 
   // 状态机顺序（《业务规则》/《数据字典》§2.2）
-  var STATUS_RANK = { deposit_pre: 0, full_pre: 1, shipping: 2, on_hand: 3, sold_out: 4 };
-  var STATUS_ORDER = ['deposit_pre', 'full_pre', 'shipping', 'on_hand', 'sold_out'];
+  var STATUS_RANK = { deposit_pre: 0, full_pre: 1, shipping: 2, on_hand: 3, sold_out: 4, lost: 5 };
+  var STATUS_ORDER = ['deposit_pre', 'full_pre', 'shipping', 'on_hand', 'sold_out', 'lost'];
   var STATUS_LABELS = {
     deposit_pre: '定尾预售', full_pre: '全款预售', shipping: '在途',
-    on_hand: '现货在手', sold_out: '已出荷'
+    on_hand: '现货在手', sold_out: '已出荷', lost: '丢失/损坏'
   };
   var PRICE_ORDER = ['filled', 'estimated', 'unknown'];
   var PRICE_LABELS = { filled: '已填写', estimated: '估算', unknown: '未知' };
@@ -74,7 +74,7 @@
     sales = sales || [];
 
     var pMap = {};
-    var totalQty = 0, totalSold = 0;
+    var totalQty = 0, totalSold = 0, lostQty = 0, lostLoss = 0;
     var filledCost = 0, totalCost = 0, estCost = 0;
     var unknownQty = 0, estimatedQty = 0;
     var statusesRemaining = [];
@@ -83,11 +83,17 @@
       pMap[p.id] = p;
       var q = num(p.quantity);
       totalQty += q;
+      var remain = q - num(p.sold_quantity);
       var lineCost = purchaseCost(p);
       if (p.price_status === 'filled') { filledCost += lineCost; totalCost += lineCost; }
       else if (p.price_status === 'estimated') { estCost += lineCost; totalCost += lineCost; estimatedQty += q; }
       else { unknownQty += q; } // unknown：不计金额
-      if (q - num(p.sold_quantity) > 0) statusesRemaining.push(p.status);
+      // 丢失：剩余件整体计为丢失损失（成本侧从在手搬走，投入不变）
+      if (p.status === 'lost' && remain > 0) {
+        lostQty += remain;
+        lostLoss += proratedPurchaseCost(p, remain);
+      }
+      if (remain > 0) statusesRemaining.push(p.status);
     });
 
     var totalProfit = 0, estimatedProfit = 0;
@@ -123,7 +129,9 @@
     return {
       total_qty: totalQty,
       total_sold: totalSold,
-      remaining: totalQty - totalSold,
+      remaining: totalQty - totalSold - lostQty,   // 在手 = 总 − 卖出 − 丢失
+      lost_qty: lostQty,              // 丢失件数
+      lost_loss: lostLoss,            // 丢失损失（成本单列，投入不变）
       total_cost: totalCost,          // 可计价总成本（含估算）
       filled_only_cost: filledCost,   // 已填写总投入
       estimated_cost: estCost,        // 估算总投入（单列）
@@ -151,6 +159,7 @@
       filled_cost: 0, estimated_cost: 0,
       total_profit: 0, estimated_profit: 0,
       on_hand: 0, in_transit: 0,
+      lost_qty: 0, lost_loss: 0,       // 丢失：件数与损失（成本单列，投入不变）
       unpriced: 0, unknown_qty: 0, estimated_qty: 0,
       order_unalloc: 0,   // 订单未核销支出（实付 − 已关联谷子核销），已计入 filled_cost
       total_net: 0        // 卖出实收总额：Σ saleNet（售价×数量 − 手续费 − 卖家邮费）
@@ -169,7 +178,10 @@
       s.total_qty += q;
       var remaining = q - num(p.sold_quantity);
       if (remaining > 0) {
-        if (p.status === 'on_hand') s.on_hand += remaining;
+        if (p.status === 'lost') {
+          s.lost_qty += remaining;
+          s.lost_loss += proratedPurchaseCost(p, remaining);
+        } else if (p.status === 'on_hand') s.on_hand += remaining;
         else if (p.status === 'shipping') s.in_transit += remaining;
       }
       var lineCost = purchaseCost(p);
@@ -207,7 +219,7 @@
       }
     });
 
-    s.net_qty = s.total_qty - s.total_sold;
+    s.net_qty = s.total_qty - s.total_sold - s.lost_qty;   // 在手 = 总 − 卖出 − 丢失
     return s;
   }
 

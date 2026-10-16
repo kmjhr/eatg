@@ -746,7 +746,7 @@
   function addToOrder(g) {
     var gid = Number(g.id);
     var reusable = (state.purchasesByGoods[gid] || []).filter(function (p) {
-      return p.order_id == null && (num(p.quantity) - num(p.sold_quantity)) > 0;
+      return p.order_id == null && (num(p.quantity) - num(p.sold_quantity)) > 0 && p.status !== 'lost';
     });
     if (!reusable.length) { addItemFromGoods(g); return; }
     var rows = reusable.map(function (p) {

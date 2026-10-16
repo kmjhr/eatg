@@ -246,6 +246,7 @@
       '</div>' +
       pricePair +
       (agg.unknown_qty ? '<p class="hint">价格未知 ' + num(agg.unknown_qty) + ' 件：成本未知，暂不计盈利。</p>' : '') +
+      (agg.lost_qty ? '<p class="hint">丢失 ' + num(agg.lost_qty) + ' 件 · 损失 ' + money(agg.lost_loss) + '（总投入不变）</p>' : '') +
       '</section>';
   }
 
@@ -750,14 +751,18 @@
     A.STATUS_ORDER.forEach(function (s) {
       if (A.STATUS_RANK[s] < r) out.push({ v: s, kind: 'back' });
     });
+    // 丢失：任何非已卖出状态都可标记；丢失件只可还原回「现货在手」（找回）
+    if (cur !== 'sold_out' && cur !== 'lost') out.push({ v: 'lost', kind: 'mark' });
+    if (cur === 'lost') out = [{ v: 'on_hand', kind: 'back' }];
     return out;
   }
 
-  function applyStatus(target) {
+  function applyStatus(target, reason) {
     var ops = [], next = [], count = 0;
     state.purchases.forEach(function (p) {
       if (remaining(p) <= 0) { next.push(p); return; }
       var rec = clone(p);
+      if (reason) rec.note = [rec.note, '丢失/损坏：' + reason].filter(Boolean).join('；');
       rec.status = target;
       next.push(rec);
       ops.push({ action: 'put', store: 'purchase_items', value: rec });
@@ -793,6 +798,38 @@
       var kind = row.dataset.kind;
       ref.close();
       var run = function () { return applyStatus(target); };
+      if (kind === 'mark') {
+        // 标记丢失：有卖出记录关联则阻止（先处理卖出）
+        var linked = state.purchases.some(function (p) {
+          return remaining(p) > 0 && state.sales.some(function (sl) { return Number(sl.purchase_item_id) === Number(p.id); });
+        });
+        if (linked) { UI.toast('该购入记录已有卖出关联，请先处理卖出后再标记丢失', 'error'); return; }
+        var ask = UI.sheet({
+          title: '标记丢失/损坏',
+          bodyHTML: '<p class="hint">丢失件从「在手」移除，成本单列为丢失损失（总投入不变）；找回可还原回「现货在手」。</p>' +
+            '<input class="input" id="lost-reason" autocomplete="off" placeholder="原因（可选）：遗落 / 损坏 / 送人 / 吞件…">',
+          footerHTML: '<button type="button" class="btn btn--secondary" data-act="cancel">取消</button>' +
+            '<button type="button" class="btn btn--primary" data-act="ok">标记丢失</button>'
+        });
+        var inEl = ask.body.querySelector('#lost-reason');
+        if (inEl) setTimeout(function () { inEl.focus(); }, 0);
+        if (ask.foot) ask.foot.addEventListener('click', function (e2) {
+          var b = e2.target.closest('[data-act]');
+          if (!b) return;
+          ask.close();
+          if (b.dataset.act !== 'ok') return;
+          var reason = inEl ? String(inEl.value || '').trim() : '';
+          applyStatus('lost', reason).then(function (n) {
+            if (!n) { UI.toast('没有可流转的购入记录', 'error'); return; }
+            UI.toast('已标记丢失/损坏' + (reason ? '（' + reason + '）' : ''), 'success');
+            return refresh();
+          }).catch(function (err) {
+            if (!(err && err.expected)) console.error('[EATG] 标记丢失失败', err);
+            UI.toast('标记失败：' + (err && err.message || err), 'error');
+          });
+        });
+        return;
+      }
       var chain = kind === 'back'
         ? UI.confirmDialog({
             title: '回退状态',
@@ -850,7 +887,7 @@
   }
 
   function openSaleSheet() {
-    var avail = state.purchases.filter(function (p) { return remaining(p) > 0; });
+    var avail = state.purchases.filter(function (p) { return remaining(p) > 0 && p.status !== 'lost'; });
     if (!avail.length) { UI.toast('暂无可卖出的购入记录（剩余件为 0）', 'error'); return; }
     var cur = avail[0].currency || (EATG.runtime && EATG.runtime.defaultCurrency) || 'CNY';
     var ref = UI.sheet({

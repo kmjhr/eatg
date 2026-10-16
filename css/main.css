@@ -21,6 +21,7 @@
   --info: #2E86C1;          /* 全款预售 */
   --shipping: #8E44AD;      /* 在途 */
   --soldout: #95A5A6;       /* 已出荷 */
+  --lost: #C0392B;          /* 丢失/损坏（深红警示） */
 
   /* 粉彩标签色（Ourtone 五色列） */
   --pastel-blue: #A8C8FA;
@@ -285,6 +286,7 @@ button {
 .badge--shipping    { background: var(--shipping); }
 .badge--on_hand     { background: var(--success); }
 .badge--sold_out    { background: var(--soldout); }
+.badge--lost       { background: var(--lost); }
 
 /* --- 按钮（Ourtone 药丸风） --- */
 .btn {
@@ -1688,6 +1690,8 @@ html[data-theme='dark'] .mkt-price{color:var(--accent)}
 .gal-badge--deposit_pre{background:var(--warn,#E67E22);color:#fff}
 .gal-badge--full_pre{background:var(--info,#2E86C1);color:#fff}
 .gal-badge--shipping{background:var(--shipping,#8E44AD);color:#fff}
+.gal-badge--on_hand{background:var(--success,#27AE60);color:#fff}
+.gal-badge--lost{background:var(--lost,#C0392B);color:#fff}
 .gal-card-name{font-size:11.5px;font-weight:600;padding:5px 6px 1px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gal-card-series{font-size:10px;color:var(--muted,#888);padding:0 6px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gal-detail{text-align:center;padding:8px 0 12px}

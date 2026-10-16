@@ -140,9 +140,10 @@
    * @returns {object} { net_qty, filled_cost, estimated_cost, total_profit, estimated_profit,
    *                     on_hand, in_transit, unpriced, unknown_qty, estimated_qty }
    */
-  function summarize(purchases, sales) {
+  function summarize(purchases, sales, orders) {
     purchases = purchases || [];
     sales = sales || [];
+    orders = orders || [];
 
     var pMap = {};
     var s = {
@@ -150,11 +151,19 @@
       filled_cost: 0, estimated_cost: 0,
       total_profit: 0, estimated_profit: 0,
       on_hand: 0, in_transit: 0,
-      unpriced: 0, unknown_qty: 0, estimated_qty: 0
+      unpriced: 0, unknown_qty: 0, estimated_qty: 0,
+      order_unalloc: 0   // 订单未核销支出（实付 − 已关联谷子核销），已计入 filled_cost
     };
 
+    // 订单已核销额（关联记录的已知本体 + 分摊）
+    var allocByOrder = {};
     purchases.forEach(function (p) {
       pMap[p.id] = p;
+      if (p.order_id != null) {
+        var k = Number(p.order_id);
+        var v = (p.unit_price != null ? num(p.unit_price) * num(p.quantity) : 0) + num(p.shipping_share);
+        allocByOrder[k] = (allocByOrder[k] || 0) + v;
+      }
       var q = num(p.quantity);
       s.total_qty += q;
       var remaining = q - num(p.sold_quantity);
@@ -166,6 +175,17 @@
       if (p.price_status === 'filled') s.filled_cost += lineCost;
       else if (p.price_status === 'estimated') { s.estimated_cost += lineCost; s.estimated_qty += q; s.unpriced += q; }
       else { s.unknown_qty += q; s.unpriced += q; }
+    });
+
+    // 订单未核销支出：实付 − 已关联谷子核销（含未知池/未关联谷子的空余款），计入总投入
+    orders.forEach(function (o) {
+      var paid = num(o.paid_total);
+      if (!(paid > 0)) return;
+      var unalloc = paid - (allocByOrder[Number(o.id)] || 0);
+      if (unalloc > 0) {
+        s.order_unalloc += unalloc;
+        s.filled_cost += unalloc;
+      }
     });
 
     sales.forEach(function (sl) {
@@ -225,7 +245,7 @@
         enums: enums,
         byGoods: byGoods,
         salesByGoods: salesByGoods,
-        summary: summarize(purchases, sales)
+        summary: summarize(purchases, sales, orders)
       };
 
       // 缓存写回（best-effort，不阻断渲染）

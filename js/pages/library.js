@@ -209,14 +209,15 @@
     var s = state.model.summary;
     var cells = [
       { label: '总件数', value: String(s.net_qty) },
-      { label: '总投入', value: money(num(s.filled_cost) + num(s.estimated_cost)) },
+      { label: '总投入', value: money(num(s.filled_cost) + num(s.estimated_cost)),
+        title: num(s.order_unalloc) > 0 ? ('含订单未核销支出 ' + money(s.order_unalloc)) : '' },
       { label: '总盈利', value: money(s.total_profit), cls: s.total_profit > 0 ? 'up' : (s.total_profit < 0 ? 'down' : '') },
       { label: '在手', value: String(s.on_hand) },
       { label: '在途', value: String(s.in_transit) },
       { label: '未计价', value: String(s.unpriced) }
     ];
     dom.summary.innerHTML = cells.map(function (c) {
-      return '<div class="summary-cell">' +
+      return '<div class="summary-cell"' + (c.title ? ' title="' + UI.esc(c.title) + '"' : '') + '>' +
         '<div class="summary-num num ' + (c.cls || '') + '">' + UI.esc(c.value) + '</div>' +
         '<div class="summary-label">' + UI.esc(c.label) + '</div>' +
         '</div>';

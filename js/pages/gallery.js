@@ -960,6 +960,7 @@
       if (state.destroyed) return;
       container.innerHTML = pageHTML();
       bindInner();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 图鉴加载失败', err);

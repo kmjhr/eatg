@@ -585,6 +585,7 @@
       renderView();
       checkReminders();
       autoFetch();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 资讯首页加载失败', err);

@@ -373,6 +373,7 @@
     return load().then(function () {
       if (state.destroyed) return;
       render();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
       var addBtn = ctx.navActions ? ctx.navActions.querySelector('#order-add') : null;
       on(addBtn, 'click', function () { go('#/order/edit?mode=new'); });
     }, function (err) {

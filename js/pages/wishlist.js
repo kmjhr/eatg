@@ -184,6 +184,7 @@
     return load().then(function () {
       if (state.destroyed) return;
       render();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 愿望中心加载失败', err);

@@ -49,6 +49,20 @@
   var dom = {};
   var booted = false;
   var currentPage = null;   // 当前挂载的页面模块（用于切换前 unmount）
+  var scrollMemory = {};    // 页面滚动位置记忆：navKey → scrollTop（从详情返回/切回时恢复）
+  var lastNav = { key: null, query: '' };
+
+  function navKey(key, query) { return key + (query ? '?' + query : ''); }
+
+  /** 页面挂载完成渲染后调用：若有该页滚动记忆则恢复（一次性消费） */
+  function restoreScroll() {
+    var k = navKey(lastNav.key, lastNav.query);
+    var y = scrollMemory[k];
+    if (y != null && y > 0) {
+      scrollMemory[k] = null;
+      global.scrollTo(0, y);
+    }
+  }
 
   // ---- 工具 ----
 
@@ -147,11 +161,16 @@
     var key = info.segments[0] || DEFAULT_ROUTE;
     var route = ROUTES[key];
 
-    // 卸载上一个页面（清理监听/定时器/弹窗）
+    // 卸载上一个页面（清理监听/定时器/弹窗）；先记录其滚动位置，返回时恢复
     if (currentPage && currentPage.unmount) {
-      try { currentPage.unmount(); } catch (err) { console.error('[EATG] 页面卸载失败:', err); }
+      var doc = document.scrollingElement || document.documentElement;
+      try {
+        if (lastNav.key != null) scrollMemory[navKey(lastNav.key, lastNav.query)] = doc.scrollTop || 0;
+        currentPage.unmount();
+      } catch (err) { console.error('[EATG] 页面卸载失败:', err); }
     }
     currentPage = null;
+    lastNav = { key: null, query: '' };
     clearNav();
 
     if (!route) {
@@ -193,16 +212,20 @@
         setBack: setBack,
         setActiveTab: setActiveTab,
         navigate: navigate,
+        restoreScroll: restoreScroll,
         toast: EATG.ui ? EATG.ui.toast : function () {}
       };
+      lastNav = { key: page.key || key, query: info.query };
       var p;
       try {
         p = page.mount(dom.pageContainer, ctx);
       } catch (err) {
+        global.scrollTo(0, 0);
         console.error('[EATG] 页面挂载失败（同步）:', err);
         if (EATG.ui && EATG.ui.toast) EATG.ui.toast('页面加载失败：' + (err && err.message || err), 'error');
         return;
       }
+      global.scrollTo(0, 0);   // 新页面从顶部开始；列表页返回时由 restoreScroll 恢复
       if (p && typeof p.then === 'function') {
         p.catch(function (err) {
           if (err && err.expected) return;
@@ -360,7 +383,8 @@
       navigate: navigate,
       routes: ROUTES,
       tabs: TAB_ROUTES,
-      parseHash: parseHash
+      parseHash: parseHash,
+      restoreScroll: restoreScroll
     };
   }
 

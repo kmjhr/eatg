@@ -945,6 +945,7 @@
       renderList();
       bindListGestures();
       bindBatchBar();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }, function (err) {
       console.error('[EATG] 收藏库加载失败', err);
       UI.toast('数据加载失败：' + (err && err.message || err), 'error');

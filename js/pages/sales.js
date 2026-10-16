@@ -192,6 +192,7 @@
       page.innerHTML = pageHTML();
       cacheDom();
       bind(ctx);
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }).catch(function (err) {
       if (!(err && err.expected)) console.error('[EATG] 卖出订单列表加载失败', err);
       UI.toast('加载失败：' + (err && err.message || err), 'error');

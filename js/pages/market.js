@@ -346,6 +346,7 @@
       if (state.destroyed) return;
       container.innerHTML = pageHTML();
       updateFilterIndicator();
+      if (ctx && ctx.restoreScroll) ctx.restoreScroll();
     }).catch(function (err) {
       if (state.destroyed) return;
       if (!(err && err.expected)) console.error('[EATG] 行情首页加载失败', err);

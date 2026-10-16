@@ -67,9 +67,10 @@
       orderId: null,
       order: {},
       items: [],
-      removed: [],
+      removed: [],            // 移除的订单行：保存时解除关联（order_id=null），不删除购入记录
       goodsList: [],
       goodsById: {},
+      purchasesByGoods: {},
       enums: { channel: [], ip: [], goods_type: [] },
       isBundle: false,
       splitMode: 'per_item',
@@ -91,13 +92,18 @@
     var addGid = params.get('add_gid');
     state.preAddGid = (addGid != null && addGid !== '' && isFinite(Number(addGid))) ? Number(addGid) : null;
 
-    return Promise.all([S.getAll('goods'), S.getAll('enums')]).then(function (r) {
+    return Promise.all([S.getAll('goods'), S.getAll('enums'), S.getAll('purchase_items')]).then(function (r) {
       state.goodsList = r[0] || [];
       state.goodsById = {};
       state.goodsList.forEach(function (g) { state.goodsById[Number(g.id)] = g; });
       var em = {};
       (r[1] || []).forEach(function (row) { em[row.key] = row.values || []; });
       state.enums = { channel: em.channel || [], ip: em.ip || [], goods_type: em.goods_type || [] };
+      // 全部购入记录按谷子款分组（用于「复用未关联订单的记录」）
+      state.purchasesByGoods = {};
+      (r[2] || []).forEach(function (p) {
+        (state.purchasesByGoods[Number(p.goods_id)] = state.purchasesByGoods[Number(p.goods_id)] || []).push(p);
+      });
 
       if (state.isNew) {
         state.order = {
@@ -659,8 +665,62 @@
       if (!b) return;
       var g = state.goodsById[Number(b.dataset.gid)];
       ref.close();
-      if (g) addItemFromGoods(g);
+      if (g) addToOrder(g);
     });
+  }
+
+  /** 添加谷子到订单：若谷子已有「未关联订单的购入记录」→ 优先复用（不重复记账）；否则新建记录 */
+  function addToOrder(g) {
+    var gid = Number(g.id);
+    var reusable = (state.purchasesByGoods[gid] || []).filter(function (p) {
+      return p.order_id == null && (num(p.quantity) - num(p.sold_quantity)) > 0;
+    });
+    if (!reusable.length) { addItemFromGoods(g); return; }
+    var rows = reusable.map(function (p) {
+      var price = (p.unit_price != null) ? centsToYuan(p.unit_price) + '元' : '未知';
+      return '<button type="button" class="opt-row" data-pid="' + p.id + '"><span>' + UI.esc(g.name || '未命名') + '</span>' +
+        '<span class="muted">×' + num(p.quantity) + ' · ' + UI.esc(A.STATUS_LABELS[p.status] || p.status) + ' · 单价 ' + price + '</span></button>';
+    }).join('');
+    var ref = UI.sheet({
+      title: '关联已有购入记录',
+      bodyHTML: '<p class="hint">该谷子已有未关联订单的购入记录：复用可避免重复记账（记录数不变，订单与谷子款共用一条记录）。</p>' +
+        '<div class="opt-list">' + rows +
+        '<button type="button" class="opt-row" data-act="new"><span>＋ 新建一条购入记录</span><span class="opt-check">›</span></button>' +
+        '</div>'
+    });
+    ref.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pid],[data-act="new"]');
+      if (!b) return;
+      ref.close();
+      if (b.dataset.act === 'new') { addItemFromGoods(g); return; }
+      var p = null;
+      (state.purchasesByGoods[gid] || []).forEach(function (x) { if (Number(x.id) === Number(b.dataset.pid)) p = x; });
+      if (!p) { addItemFromGoods(g); return; }
+      addReuseItem(p, g);
+    });
+  }
+
+  /** 复用已有购入记录加入订单（记录 id 不变，保存时关联到本订单） */
+  function addReuseItem(p, g) {
+    syncInputs();
+    var dup = state.items.some(function (it) { return Number(it.id) === Number(p.id); });
+    if (dup) { UI.toast('该购入记录已在订单中', 'info'); return; }
+    state.items.push({
+      id: Number(p.id), _reuse: true, goods_id: Number(p.goods_id),
+      _gname: g.name || '未命名',
+      _market_price: (g.market_price != null ? g.market_price : null),
+      quantity: num(p.quantity) || 1,
+      unit_price: (p.unit_price != null ? p.unit_price : null),
+      currency: p.currency || state.order.currency || 'CNY',
+      shipping_share: num(p.shipping_share),
+      channel: p.channel || state.order.channel || '',
+      status: p.status || 'shipping',
+      price_status: p.price_status || (p.unit_price != null ? 'filled' : 'unknown'),
+      note: p.note || '',
+      sold_quantity: num(p.sold_quantity) || 0
+    });
+    if (state.splitMode !== 'manual') { render(); applySplit(); } else render();
+    UI.toast('已复用购入记录：' + (g.name || '未命名') + '（记录数不变）', 'success');
   }
 
   function openNewGoodsSheet() {
@@ -725,7 +785,8 @@
     var it = state.items[i];
     if (!it) return;
     if (num(it.sold_quantity) > 0) { UI.toast('该件已有卖出记录，请先在谷子款详情处理后再移除', 'error'); return; }
-    if (it.id != null) state.removed.push({ id: it.id, goods_id: it.goods_id });
+    // 移除 = 解除关联：保存时该购入记录 order_id 置空（保留记录，不重复删除）
+    if (it.id != null) state.removed.push(buildItemRec(it));
     state.items.splice(i, 1);
     render();
     if (state.splitMode !== 'manual') applySplit();
@@ -926,8 +987,9 @@
       ops.push({ action: it.id != null ? 'put' : 'add', store: 'purchase_items', value: buildItemRec(it) });
       affected[it.goods_id] = 1;
     });
-    state.removed.forEach(function (r) {
-      ops.push({ action: 'del', store: 'purchase_items', key: r.id });
+    state.removed.forEach(function (rec) {
+      var r = clone(rec); r.order_id = null;
+      ops.push({ action: 'put', store: 'purchase_items', value: r });
       affected[r.goods_id] = 1;
     });
     var ids = Object.keys(affected);

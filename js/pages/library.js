@@ -835,6 +835,7 @@
     state.view = view;
     renderToolbar();
     renderList();
+    updateAddBtn();
   }
 
   // ---- 顶部导航（搜索 + 筛选 + 新增） ----
@@ -860,6 +861,8 @@
     var addEl = ctx.navActions.querySelector('#lib-add');
     dom.searchEl = searchEl;
     dom.filterEl = filterEl;
+    dom.addEl = addEl;
+    updateAddBtn();
 
     dom.searchTimer = null;
     on(searchEl, 'input', function () {
@@ -872,7 +875,22 @@
     });
 
     on(filterEl, 'click', openFilterSheet);
-    on(addEl, 'click', function () { navigate('#/goods/edit?mode=add'); });
+    on(addEl, 'click', function () {
+      if (state.view === 'order') navigate('#/order/edit?mode=new');
+      else navigate('#/goods/edit?mode=add');
+    });
+  }
+
+  /** 按当前视图更新新增键（按订单 → 新建订单） */
+  function updateAddBtn() {
+    if (!dom.addEl) return;
+    if (state.view === 'order') {
+      dom.addEl.setAttribute('aria-label', '新建订单');
+      dom.addEl.title = '新建订单';
+    } else {
+      dom.addEl.setAttribute('aria-label', '新增谷子');
+      dom.addEl.title = '新增谷子';
+    }
   }
 
   function updateFilterIndicator() {

@@ -1,0 +1,70 @@
+{
+  "data": [
+    {
+      "id": "page-style-guide",
+      "title": "设计规范拆解",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1762869600000,
+      "devMetadata": {
+        "htmlSrc": "pages/style-guide.html",
+        "interactions": []
+      },
+      "canvasData": { "x": 0, "y": 0, "group": 0 }
+    },
+    {
+      "id": "page-stage-light",
+      "title": "舞台 - 浅色",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1762869600000,
+      "devMetadata": {
+        "htmlSrc": "pages/stage-light.html",
+        "interactions": []
+      },
+      "canvasData": { "x": 0, "y": 0, "group": 0 }
+    },
+    {
+      "id": "page-stage-dark",
+      "title": "舞台 - 深色",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1762869600000,
+      "devMetadata": {
+        "htmlSrc": "pages/stage-dark.html",
+        "interactions": []
+      },
+      "canvasData": { "x": 0, "y": 0, "group": 0 }
+    },
+    {
+      "id": "page-gallery-light",
+      "title": "图鉴 - 浅色",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1762869600000,
+      "devMetadata": {
+        "htmlSrc": "pages/gallery-light.html",
+        "interactions": []
+      },
+      "canvasData": { "x": 0, "y": 0, "group": 0 }
+    },
+    {
+      "id": "page-gallery-dark",
+      "title": "图鉴 - 深色",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1762869600000,
+      "devMetadata": {
+        "htmlSrc": "pages/gallery-dark.html",
+        "interactions": []
+      },
+      "canvasData": { "x": 0, "y": 0, "group": 0 }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "mobile",
+    "projectName": "Ourtone 风格移动端 UI 稿",
+    "designLibrary": null
+  }
+}

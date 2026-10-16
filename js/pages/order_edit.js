@@ -78,7 +78,8 @@
       paidManual: false,   // 实付总额是否手动填写（不再自动跟随本体+邮费）
       orderImage: null,
       preAddGid: null,
-      preAddApplied: false
+      preAddApplied: false,
+      salesByPid: {}       // purchase_item_id → 卖出记录[]（未知池回款计算用）
     };
   }
 
@@ -92,7 +93,7 @@
     var addGid = params.get('add_gid');
     state.preAddGid = (addGid != null && addGid !== '' && isFinite(Number(addGid))) ? Number(addGid) : null;
 
-    return Promise.all([S.getAll('goods'), S.getAll('enums'), S.getAll('purchase_items')]).then(function (r) {
+    return Promise.all([S.getAll('goods'), S.getAll('enums'), S.getAll('purchase_items'), S.getAll('sale_items')]).then(function (r) {
       state.goodsList = r[0] || [];
       state.goodsById = {};
       state.goodsList.forEach(function (g) { state.goodsById[Number(g.id)] = g; });
@@ -103,6 +104,12 @@
       state.purchasesByGoods = {};
       (r[2] || []).forEach(function (p) {
         (state.purchasesByGoods[Number(p.goods_id)] = state.purchasesByGoods[Number(p.goods_id)] || []).push(p);
+      });
+      // 卖出记录按购入记录分组（未知池回款累计）
+      state.salesByPid = {};
+      (r[3] || []).forEach(function (sl) {
+        if (sl.purchase_item_id == null) return;
+        (state.salesByPid[Number(sl.purchase_item_id)] = state.salesByPid[Number(sl.purchase_item_id)] || []).push(sl);
       });
 
       if (state.isNew) {
@@ -188,6 +195,24 @@
       paid: paid, count: count, balanced: balanced, diff: diff, remain: remain,
       pendingBody: pendingBody, pendingShip: pendingShip
     };
+  }
+
+  // ---- 未知池（《业务规则》§4.1） ----
+
+  /** 订单未知池信息：池金额 / 已回款 / 待定盈亏 / 未知件数 / 是否已结算 */
+  function poolInfo() {
+    var m = computeModel();
+    var unknownQty = 0, unknownSold = 0;
+    state.items.forEach(function (it) {
+      if (it.unit_price != null) return;
+      unknownQty += num(it.quantity);
+      (state.salesByPid[Number(it.id)] || []).forEach(function (sl) { unknownSold += A.saleNet(sl); });
+    });
+    var ps = state.order.price_status || 'filled';
+    var pool = ((m.paid != null && m.paid > 0) && ps !== 'unknown') ? Math.max(0, m.paid - m.sumBody - m.sumAlloc) : 0;
+    return { pool: pool, back: unknownSold, pending: unknownSold - pool,
+      unknownQty: unknownQty, settled: !!state.order.pool_settled,
+      settledProfit: num(state.order.pool_profit), ps: ps };
   }
 
   // ---- 模板 ----
@@ -318,6 +343,32 @@
     return '<div class="form-section">' + head + body + '</div>';
   }
 
+  function poolHTML() {
+    if (state.isNew) return '';
+    var pi = poolInfo();
+    if (pi.unknownQty <= 0 && !pi.settled) return '';
+    var head = '<div class="form-section-title">未知池 <span class="muted">（未定价件共用 · 订单级整体结算）</span></div>';
+    var body;
+    if (pi.settled) {
+      body = '<div class="pool-block"><div class="pool-row"><span>未知池已结算</span>' +
+        '<b class="num ' + (pi.settledProfit >= 0 ? 'text-profit' : 'text-loss') + '">' + (pi.settledProfit >= 0 ? '盈 +' : '亏 ') + money(Math.abs(pi.settledProfit)) + '</b></div></div>';
+    } else if (pi.ps === 'unknown') {
+      body = '<div class="pool-block"><div class="pool-row muted">订单实付未知，暂无未知池；请先把实付补录为「已知/估计」后再结算。</div></div>';
+    } else if (pi.pool <= 0) {
+      body = '<div class="pool-block"><div class="pool-row muted">未知池金额 ≤ 0（已核销谷子成本 ≥ 实付）：请检查订单金额与谷子价格；未定价件卖出走「手动结算」。</div></div>';
+    } else {
+      body = '<div class="pool-block">' +
+        '<div class="pool-row"><span>池金额</span><b class="num">' + money(pi.pool) + '</b></div>' +
+        '<div class="pool-row"><span>已回款（未知件卖出累计实收）</span><b class="num">' + money(pi.back) + '</b></div>' +
+        '<div class="pool-row"><span>待定盈亏（趋势参考，非最终）</span>' +
+          '<b class="num ' + (pi.pending >= 0 ? 'text-profit' : 'text-loss') + '">' + (pi.pending >= 0 ? '+' : '') + money(pi.pending) + '</b></div>' +
+        '<div class="pool-actions"><button type="button" class="btn btn--primary" data-act="settle-pool">结算未知池</button></div>' +
+        '<div class="pool-note muted">结算 = 总回款 − 池金额，记为本订单整体盈亏，并给未定价件分摊成本落盘（price_status 置已填写/估算）。最后一件未知谷子卖出后建议立即结算。</div>' +
+        '</div>';
+    }
+    return '<div class="form-section">' + head + body + '</div>';
+  }
+
   function balanceHTML() {
     return '<div class="balance-row" id="o-balance"><span class="balance-mark" id="o-bmark">✓</span><span id="o-btext">账目平衡</span></div>';
   }
@@ -331,7 +382,7 @@
 
   function pageHTML() {
     return '<section class="page page--order">' +
-      infoHTML() + amountHTML() + splitHTML() + itemsHTML() + balanceHTML() + actionsHTML() +
+      infoHTML() + amountHTML() + poolHTML() + splitHTML() + itemsHTML() + balanceHTML() + actionsHTML() +
       '</section>';
   }
 
@@ -870,6 +921,7 @@
       if (a === 'add-channel') { onAddChannel(); return; }
       if (a === 'save') { doSave(); return; }
       if (a === 'del-order') { doDelete(); return; }
+      if (a === 'settle-pool') { settlePool(); return; }
     });
 
     on(dom.page, 'input', onItemField);
@@ -902,6 +954,77 @@
     if (f.dataset.f === 'share') { state.splitMode = 'manual'; updateModeChips(); updateHint(); }
     updateSum(i);
     updateAmounts();
+  }
+
+  // ---- 未知池结算（§4.1） ----
+
+  /** 未知池结算入口：整体盈亏 = 总回款 − 池金额；未定价件成本分摊落盘；卖出记录打 cost_settled */
+  function settlePool() {
+    if (state.busy || state.isNew) return;
+    var pi = poolInfo();
+    if (pi.settled) { UI.toast('未知池已结算过', 'info'); return; }
+    if (pi.ps === 'unknown') { UI.toast('订单实付未知，请先把实付补录为已知/估计', 'error'); return; }
+    if (pi.pool <= 0) { UI.toast('未知池金额 ≤ 0，无法结算；请检查订单金额与谷子价格', 'error'); return; }
+    if (pi.unknownQty <= 0) { UI.toast('该订单没有未定价件', 'info'); return; }
+
+    var m = computeModel();
+    var profit = pi.back - pi.pool;
+    UI.confirmDialog({
+      title: '结算未知池',
+      message: '订单实付 ' + money(m.paid) + '，未知池金额 ' + money(pi.pool) + '，未知件累计回款 ' + money(pi.back) + '。\n结算后：本订单整体盈亏 ' + (profit >= 0 ? '+' : '') + money(profit) + '（' + (pi.ps === 'estimated' ? '估算' : '已实现') + '盈利），' + pi.unknownQty + ' 件未定价谷子按 ' + money(pi.pool) + ' 分摊成本落盘。',
+      confirmText: '结算',
+      danger: profit < 0
+    }).then(function (ok) {
+      if (!ok) return;
+      setBusy(true);
+      doSettle(pi, profit).then(function () {
+        UI.toast('未知池已结算：盈亏 ' + (profit >= 0 ? '+' : '') + money(profit), profit >= 0 ? 'success' : 'info');
+        render();
+      }).catch(function (err) {
+        setBusy(false);
+        if (!(err && err.expected)) console.error('[EATG] 未知池结算失败', err);
+        UI.toast('结算失败：' + (err && err.message || err), 'error');
+      });
+    });
+  }
+
+  /** 执行结算：分摊落盘 + 卖出记录 cost_settled + 订单标记 + 重算 agg */
+  function doSettle(pi, profit) {
+    var unknowns = state.items.filter(function (it) { return it.unit_price == null; });
+    var totalQ = unknowns.reduce(function (a, it) { return a + num(it.quantity); }, 0) || 1;
+    var remain = pi.pool;
+    var recs = [];
+    unknowns.forEach(function (it, i) {
+      var q = num(it.quantity) || 1;
+      var share = (i === unknowns.length - 1) ? remain : Math.floor(pi.pool * q / totalQ);
+      remain -= share;
+      var r = clone(it);
+      r.unit_price = Math.round(share / q);
+      r.price_status = (pi.ps === 'estimated') ? 'estimated' : 'filled';
+      delete r._gname; delete r._market_price; delete r._new;
+      recs.push({ action: 'put', store: 'purchase_items', value: r });
+    });
+    var saleOps = [];
+    if (pi.back > 0) {
+      unknowns.forEach(function (it) {
+        (state.salesByPid[Number(it.id)] || []).forEach(function (sl) {
+          var r = clone(sl);
+          var net = A.saleNet(sl);
+          r.cost_settled = true;
+          r.cost_base = (net <= 0) ? 0 : Math.round(pi.pool * net / pi.back);
+          saleOps.push({ action: 'put', store: 'sale_items', value: r });
+        });
+      });
+    }
+    var o = clone(state.order);
+    o.pool_settled = new Date().toISOString();
+    o.pool_profit = profit;
+    saleOps.push({ action: 'put', store: 'orders', value: o });
+    var ids = {};
+    unknowns.forEach(function (it) { ids[it.goods_id] = 1; });
+    return S.bulk(['purchase_items', 'sale_items', 'orders'], recs.concat(saleOps)).then(function () {
+      return refreshAggs(Object.keys(ids));
+    });
   }
 
   /** 订单实付价格状态：已知/估计/未知；未知时清空实付并禁用输入 */

@@ -72,12 +72,17 @@
     var unknownSold = 0;
     items.forEach(function (p) {
       if (p.unit_price != null) return;
-      (state.salesByPid[Number(p.id)] || []).forEach(function (sl) { unknownSold += num(sl.unit_price) * num(sl.quantity); });
+      (state.salesByPid[Number(p.id)] || []).forEach(function (sl) { unknownSold += A.saleNet(sl); });
     });
     var remain = paid - alloc - unknownSold;
     var unknownQty = items.reduce(function (a, p) { return a + (p.unit_price == null ? num(p.quantity) : 0); }, 0);
+    // 未知池：池金额 = 实付 − 已核销谷子成本；已回款 = 未知件卖出实收累计；待定盈亏 = 已回款 − 池（§4.1）
+    var pool = ((paid > 0) && (o.price_status || 'filled') !== 'unknown') ? Math.max(0, paid - alloc) : 0;
+    var pending = unknownSold - pool;
     return { items: items, ship: ship, body: body, paid: paid, count: count, remain: remain,
-      unknownQty: unknownQty, paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle,
+      unknownQty: unknownQty, unknownSold: unknownSold, pool: pool, pending: pending,
+      settled: !!o.pool_settled, settledProfit: num(o.pool_profit),
+      paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle,
       ps: o.price_status || 'filled'      // 订单实付价格状态
     };
   }
@@ -160,6 +165,15 @@
     var psTag = st.ps === 'unknown' ? '<span class="tag tag--unknown">价格未知</span>'
       : (st.ps === 'estimated' ? '<span class="tag tag--est">估算</span>' : '');
     var flags = psTag + (st.bundle ? '<span class="tag tag--bund">打包</span>' : '') + badgeHTML(st.status);
+    var poolLine = '';
+    if (st.settled) {
+      poolLine = '<div class="order-flags"><span class="tag tag--pool">未知池已结算 ' +
+        (st.settledProfit >= 0 ? '盈 +' : '亏 ') + money(Math.abs(st.settledProfit)) + '</span></div>';
+    } else if (st.unknownQty > 0 && st.ps !== 'unknown') {
+      poolLine = '<div class="order-flags"><span class="tag tag--pool">未知池 剩 ' + money(Math.max(0, st.pool - st.unknownSold)) + '</span>' +
+        '<span class="tag tag--pool">回款 ' + money(st.unknownSold) + '</span>' +
+        '<span class="tag ' + (st.pending >= 0 ? 'tag--profit' : 'tag--loss') + '">待定 ' + money(st.pending) + '</span></div>';
+    }
     return '<article class="order-card order-card--list' + (sel ? ' is-selected' : '') + '" data-oid="' + o.id + '">' +
         '<div class="order-row">' + pick +
           '<div class="order-body">' +
@@ -174,7 +188,8 @@
               '<span>实付 <b class="num">' + (st.ps === 'unknown' ? '—' : money(st.paid)) + '</b></span>' +
               (st.paidManual && st.ps !== 'unknown' ? '<span>余款 <b class="num">' + money(Math.max(0, st.remain)) + '</b></span>' : '') +
             '</div>' +
-            (st.unknownQty > 0 ? '<div class="order-flags"><span class="tag tag--unknown">价格未知 ' + st.unknownQty + ' 件</span></div>' : '') +
+            (st.unknownQty > 0 && !st.settled ? '<div class="order-flags"><span class="tag tag--unknown">价格未知 ' + st.unknownQty + ' 件</span></div>' : '') +
+            poolLine +
             '<div class="order-flags">' + flags + '</div>' +
           '</div>' +
         '</div>' +

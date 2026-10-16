@@ -648,6 +648,11 @@ html[data-theme='dark'] .thumb-ph { background: linear-gradient(135deg, #2A2A2A,
 .tag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font-size: 10px; }
 .tag--est { background: rgba(230, 126, 34, 0.15); color: var(--warn); }
 .tag--unknown { background: var(--fill); color: var(--ink-3); }
+.tag--pool { background: rgba(212, 168, 83, 0.16); color: var(--warn); }
+.tag--profit { background: rgba(39, 174, 96, 0.14); color: var(--success); }
+.tag--loss { background: rgba(231, 76, 60, 0.14); color: var(--danger); }
+.text-profit { color: var(--success); }
+.text-loss { color: var(--danger); }
 
 /* 批量选择圈 */
 .pick {
@@ -1394,6 +1399,15 @@ html[data-theme='dark'] .market-price { color: var(--accent); }
 }
 .balance-row.is-bad { background: rgba(231, 76, 60, 0.12); color: var(--danger); }
 .balance-mark { flex: 0 0 auto; font-weight: 700; }
+
+/* --- P07 订单未知池（§4.1） --- */
+.form-section-title { margin-bottom: 10px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.pool-block { display: flex; flex-direction: column; gap: 8px; }
+.pool-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.pool-row b { font-size: 14px; }
+.pool-actions { margin-top: 4px; }
+.pool-actions .btn { width: 100%; height: 38px; }
+.pool-note { margin-top: 8px; line-height: 1.5; }
 
 /* --- P07 订单截图 --- */
 .order-img-grid { display: flex; flex-wrap: wrap; gap: 8px; }

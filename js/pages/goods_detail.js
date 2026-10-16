@@ -80,7 +80,12 @@
   function lineProfitCny(s) {
     var p = null;
     state.purchases.forEach(function (it) { if (Number(it.id) === Number(s.purchase_item_id)) p = it; });
-    if (!p || p.price_status === 'unknown') return { value: null, kind: 'unknown' };
+    if (!p) return { value: null, kind: 'unknown' };
+    // 未知价格池已结算件：成本=落盘 cost_base（订单最后一未知件卖出时结算）
+    if (s.cost_settled && s.cost_base != null) {
+      return { value: saleNetCny(s) - cnyCents(num(s.cost_base), s.currency), kind: 'filled', settled: true };
+    }
+    if (p.price_status === 'unknown') return { value: null, kind: 'unknown' };
     var cost = A.proratedPurchaseCost(p, s.quantity);
     var v = saleNetCny(s) - cost;
     return { value: v, kind: p.price_status === 'estimated' ? 'estimated' : 'filled' };
@@ -322,7 +327,8 @@
       else {
         var cls = pf.value > 0 ? 'up' : (pf.value < 0 ? 'down' : '');
         profit = '<span class="num profit ' + cls + '">' + money(pf.value) + '</span>' +
-          (pf.kind === 'estimated' ? '<span class="tag tag--est">估算</span>' : '');
+          (pf.kind === 'estimated' ? '<span class="tag tag--est">估算</span>' : '') +
+          (pf.settled ? '<span class="tag tag--est">订单结算</span>' : '');
       }
       var orderLink = s.sale_order_id
         ? '<button type="button" class="tl-order-link" data-act="goto-sale-order" data-soid="' + s.sale_order_id + '">来自卖出订单 ›</button>'

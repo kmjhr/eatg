@@ -48,7 +48,12 @@
     items.forEach(function (it) {
       count += num(it.quantity);
       var p = state.purchasesById[it.purchase_item_id];
-      if (!p || p.price_status === 'unknown') return;
+      if (!p) return;
+      if (it.cost_settled && it.cost_base != null) {
+        profit += A.saleNet(it) - num(it.cost_base);
+        return;
+      }
+      if (p.price_status === 'unknown') return;
       var pr = A.saleNet(it) - A.proratedPurchaseCost(p, it.quantity);
       if (p.price_status === 'filled') profit += pr;
       else estProfit += pr;

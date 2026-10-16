@@ -76,7 +76,9 @@
       enums: { channel: [], sale_channel: [] },
       splitMode: 'per_item',
       fromGoodsId: null,      // 从谷子详情批量卖出进入
-      orders: []              // 全部购入订单（用于卖出后补录关联）
+      orders: [],             // 全部购入订单（用于卖出后补录关联）
+      ordersById: {},         // id → 订单
+      salesByPid: {}          // purchase_item_id → 卖出记录[]
     };
   }
 
@@ -617,6 +619,7 @@
       // 写入/更新各件
       state.items.forEach(function (it) {
         var rec = buildItemRec(it);
+        settleUnknownCost(rec, it);
         rec.sale_order_id = state.orderId;
         rec.sale_date = orderRec.sale_date;
         rec.channel = orderRec.channel;
@@ -684,6 +687,7 @@
     if (qty > remain) { UI.toast('卖出数量超过剩余可卖（' + remain + ' 件）', 'error'); return; }
     var net = price * qty - fee - ship;
     var rec = clone(it);
+    settleUnknownCost(rec, it);
     rec.sale_date = dom.sDate.value || U.todayStr();
     rec.quantity = qty;
     rec.unit_price = price;
@@ -783,6 +787,65 @@
   }
 
   function setBusy(b) { state.busy = b; var btn = document.getElementById('o-save'); if (btn) btn.disabled = b; }
+
+  /** 被排除的卖出记录 id：编辑卖出订单时排除原订单记录，单件编辑时排除自己 */
+  function excludedSaleIds() {
+    if (state.mode === 'item-edit' && state.item) return [Number(state.item.id)];
+    return (state.origItemIds || []).map(Number);
+  }
+
+  /**
+   * 订单「未知价格池」状态。
+   * 未知池 = 订单实付 − Σ已知价格谷子(本体) − Σ邮费分摊 − Σ未知价格谷子已卖出金额
+   * @returns {{unknownQty:number, unknownQtySold:number, remain:number, oid:number|null}}
+   */
+  function orderUnknownState(oid) {
+    var excl = excludedSaleIds();
+    var unknownQty = 0, unknownQtySold = 0, knownBody = 0, alloc = 0;
+    Object.keys(state.purchasesById).forEach(function (pid) {
+      var p = state.purchasesById[pid];
+      if (Number(p.order_id) !== Number(oid)) return;
+      alloc += num(p.shipping_share);
+      if (p.unit_price != null) { knownBody += num(p.unit_price) * num(p.quantity); return; }
+      unknownQty += num(p.quantity);
+      (state.salesByPid[Number(p.id)] || []).forEach(function (sl) {
+        if (excl.indexOf(Number(sl.id)) >= 0) return;
+        unknownQtySold += num(sl.quantity);
+        // 卖出核销额：售价×数量（下方 soldUnknown 单独累计金额）
+      });
+    });
+    var soldUnknownAmt = 0;
+    Object.keys(state.purchasesById).forEach(function (pid) {
+      var p = state.purchasesById[pid];
+      if (Number(p.order_id) !== Number(oid) || p.unit_price != null) return;
+      (state.salesByPid[Number(p.id)] || []).forEach(function (sl) {
+        if (excl.indexOf(Number(sl.id)) >= 0) return;
+        soldUnknownAmt += num(sl.unit_price) * num(sl.quantity);
+      });
+    });
+    var o = state.ordersById[Number(oid)];
+    var paid = o ? num(o.paid_total) : 0;
+    return { unknownQty: unknownQty, unknownQtySold: unknownQtySold, remain: paid - knownBody - alloc - soldUnknownAmt, oid: Number(oid) };
+  }
+
+  /** 对一条卖出记录结算未知成本：最后一未知件 → 落 cost_base/cost_settled；否则清除 */
+  function settleUnknownCost(rec, it) {
+    var p = state.purchasesById[Number(it.purchase_item_id)];
+    if (!p || p.unit_price != null || p.order_id == null) {
+      delete rec.cost_base; rec.cost_settled = false;
+      return;
+    }
+    var st = orderUnknownState(Number(p.order_id));
+    var qty = num(it.quantity);
+    var remainingAfter = st.unknownQty - st.unknownQtySold - qty;
+    if (remainingAfter <= 0) {
+      // 最后一件未知谷子：成本 = 剩余未知池
+      rec.cost_base = Math.max(0, st.remain);
+      rec.cost_settled = true;
+    } else {
+      delete rec.cost_base; rec.cost_settled = false;
+    }
+  }
 
   /** 卖出保存后：对未关联订单的购入记录提供「补录购入订单」入口（订单余款随之核销） */
   function offerLinkPurchases(pids, done) {
@@ -884,7 +947,8 @@
       S.getAll('purchase_items'),
       S.get('enums', 'channel'),
       S.get('enums', 'sale_channel'),
-      S.getAll('orders')
+      S.getAll('orders'),
+      S.getAll('sale_items')
     ]).then(function (r) {
       state.goodsById = {};
       (r[0] || []).forEach(function (g) { state.goodsById[g.id] = g; });
@@ -894,6 +958,13 @@
       state.enums.sale_channel = (r[3] && r[3].values) || [];
       state.orders = (r[4] || []).slice().sort(function (a, b) {
         return String(b.order_date || '').localeCompare(String(a.order_date || '')) || (Number(b.id) - Number(a.id));
+      });
+      state.ordersById = {};
+      state.orders.forEach(function (o) { state.ordersById[Number(o.id)] = o; });
+      state.salesByPid = {};
+      (r[5] || []).forEach(function (sl) {
+        if (sl.purchase_item_id == null) return;
+        (state.salesByPid[Number(sl.purchase_item_id)] = state.salesByPid[Number(sl.purchase_item_id)] || []).push(sl);
       });
       state.fromGoodsId = params.get('goods_id') ? Number(params.get('goods_id')) : null;
 

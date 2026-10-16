@@ -154,7 +154,8 @@
       var p = pMap[s.purchase_item_id];
       var g = goodsById[s.goods_id];
       if (!p || !g) return;
-      var profit = A.saleNet(s) - A.proratedPurchaseCost(p, s.quantity);
+      var profit = A.saleNet(s) - (s.cost_settled && s.cost_base != null ? num(s.cost_base) : A.proratedPurchaseCost(p, s.quantity));
+      var settled = !!(s.cost_settled && s.cost_base != null);
 
       var keys = [];
       if (dim === 'goods') keys.push({ key: 'g_' + g.id, label: g.name || ('谷子#' + g.id) });
@@ -169,7 +170,8 @@
       }
       keys.forEach(function (k) {
         if (!map[k.key]) { map[k.key] = { key: k.key, label: k.label, profit: 0, estProfit: 0, count: 0 }; order.push(k.key); }
-        if (p.price_status === 'filled') map[k.key].profit += profit;
+        if (settled) map[k.key].profit += profit;
+        else if (p.price_status === 'filled') map[k.key].profit += profit;
         else if (p.price_status === 'estimated') map[k.key].estProfit += profit;
         map[k.key].count += num(s.quantity);
       });

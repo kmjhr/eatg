@@ -95,10 +95,19 @@
       totalSold += num(s.quantity);
       var p = pMap[s.purchase_item_id];
       if (!p) return;
-      var profit = saleNet(s) - proratedPurchaseCost(p, s.quantity);
-      if (p.price_status === 'filled') totalProfit += profit;
-      else if (p.price_status === 'estimated') estimatedProfit += profit;
-      // unknown：成本未知，盈利不计算
+      var profit;
+      // 未知价格池已结算件：成本=落盘的 cost_base，按已实现盈利计入
+      if (s.cost_settled && s.cost_base != null) {
+        profit = saleNet(s) - num(s.cost_base);
+        totalProfit += profit;
+      } else if (p.price_status === 'filled') {
+        profit = saleNet(s) - proratedPurchaseCost(p, s.quantity);
+        totalProfit += profit;
+      } else if (p.price_status === 'estimated') {
+        profit = saleNet(s) - proratedPurchaseCost(p, s.quantity);
+        estimatedProfit += profit;
+      }
+      // unknown 且未结算：成本未知，盈利不计算
     });
 
     // 代表状态：剩余件中「最靠前（最待办）」的状态；否则若已全部出荷为 sold_out
@@ -163,9 +172,13 @@
       s.total_sold += num(sl.quantity);
       var p = pMap[sl.purchase_item_id];
       if (!p) return;
-      var profit = saleNet(sl) - proratedPurchaseCost(p, sl.quantity);
-      if (p.price_status === 'filled') s.total_profit += profit;
-      else if (p.price_status === 'estimated') s.estimated_profit += profit;
+      if (sl.cost_settled && sl.cost_base != null) {
+        s.total_profit += saleNet(sl) - num(sl.cost_base);
+      } else if (p.price_status === 'filled') {
+        s.total_profit += saleNet(sl) - proratedPurchaseCost(p, sl.quantity);
+      } else if (p.price_status === 'estimated') {
+        s.estimated_profit += saleNet(sl) - proratedPurchaseCost(p, sl.quantity);
+      }
     });
 
     s.net_qty = s.total_qty - s.total_sold;

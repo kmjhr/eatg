@@ -37,6 +37,7 @@
       orders: [],
       itemsByOrder: {},
       goodsById: {},
+      salesByPid: {},
       enums: { channel: [] },
       filters: { channel: '', time: '' },
       selectMode: false,
@@ -62,15 +63,21 @@
     var body = num(o.goods_total);
     var paid = (o.paid_total != null) ? num(o.paid_total) : (body + ship);
     var count = items.reduce(function (a, p) { return a + num(p.quantity); }, 0);
-    // 已核销 = 已填单价的件（本体×数量） + 邮费分摊；余款 = 实付 − 已核销
+    // 已核销 = 已填单价的件（本体×数量） + 邮费分摊；余款 = 实付 − 已核销 − 未知价格谷子已卖出金额（未知池核销）
     var alloc = items.reduce(function (a, p) {
       var q = num(p.quantity);
       var b = (p.unit_price != null) ? num(p.unit_price) * q : 0;
       return a + b + num(p.shipping_share);
     }, 0);
-    var remain = paid - alloc;
+    var unknownSold = 0;
+    items.forEach(function (p) {
+      if (p.unit_price != null) return;
+      (state.salesByPid[Number(p.id)] || []).forEach(function (sl) { unknownSold += num(sl.unit_price) * num(sl.quantity); });
+    });
+    var remain = paid - alloc - unknownSold;
+    var unknownQty = items.reduce(function (a, p) { return a + (p.unit_price == null ? num(p.quantity) : 0); }, 0);
     return { items: items, ship: ship, body: body, paid: paid, count: count, remain: remain,
-      paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle };
+      unknownQty: unknownQty, paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle };
   }
 
   function inChannel(o) {
@@ -99,7 +106,7 @@
   // ---- 数据加载 ----
 
   function load() {
-    return Promise.all([S.getAll('orders'), S.getAll('purchase_items'), S.getAll('goods'), S.getAll('enums')])
+    return Promise.all([S.getAll('orders'), S.getAll('purchase_items'), S.getAll('goods'), S.getAll('enums'), S.getAll('sale_items')])
       .then(function (r) {
         state.orders = r[0] || [];
         var by = {};
@@ -111,6 +118,12 @@
         var em = {};
         (r[3] || []).forEach(function (row) { em[row.key] = row.values || []; });
         state.enums = em;
+        var spm = {};
+        (r[4] || []).forEach(function (sl) {
+          if (sl.purchase_item_id == null) return;
+          (spm[Number(sl.purchase_item_id)] = spm[Number(sl.purchase_item_id)] || []).push(sl);
+        });
+        state.salesByPid = spm;
       });
   }
 
@@ -157,6 +170,7 @@
               '<span>实付 <b class="num">' + money(st.paid) + '</b></span>' +
               (st.paidManual ? '<span>余款 <b class="num">' + money(Math.max(0, st.remain)) + '</b></span>' : '') +
             '</div>' +
+            (st.unknownQty > 0 ? '<div class="order-flags"><span class="tag tag--unknown">价格未知 ' + st.unknownQty + ' 件</span></div>' : '') +
             '<div class="order-flags">' + flags + '</div>' +
           '</div>' +
         '</div>' +

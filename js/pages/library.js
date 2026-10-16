@@ -208,12 +208,12 @@
   function renderSummary() {
     var s = state.model.summary;
     var cells = [
-      { label: '总件数', value: String(s.net_qty) },
+      { label: '总件数', value: String(s.total_qty), title: '购入累计件数' },
+      { label: '卖出', value: String(s.total_sold), title: '实收 ' + money(s.total_net) },
+      { label: '在手', value: String(s.net_qty), title: '总件数 − 卖出 = ' + s.total_qty + ' − ' + s.total_sold + '；现货 ' + s.on_hand + ' · 在途 ' + s.in_transit },
       { label: '总投入', value: money(num(s.filled_cost) + num(s.estimated_cost)),
         title: num(s.order_unalloc) > 0 ? ('含订单未核销支出 ' + money(s.order_unalloc)) : '' },
       { label: '总盈利', value: money(s.total_profit), cls: s.total_profit > 0 ? 'up' : (s.total_profit < 0 ? 'down' : '') },
-      { label: '在手', value: String(s.on_hand) },
-      { label: '在途', value: String(s.in_transit) },
       { label: '未计价', value: String(s.unpriced) }
     ];
     dom.summary.innerHTML = cells.map(function (c) {

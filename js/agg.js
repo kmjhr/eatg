@@ -152,7 +152,8 @@
       total_profit: 0, estimated_profit: 0,
       on_hand: 0, in_transit: 0,
       unpriced: 0, unknown_qty: 0, estimated_qty: 0,
-      order_unalloc: 0   // 订单未核销支出（实付 − 已关联谷子核销），已计入 filled_cost
+      order_unalloc: 0,   // 订单未核销支出（实付 − 已关联谷子核销），已计入 filled_cost
+      total_net: 0        // 卖出实收总额：Σ saleNet（售价×数量 − 手续费 − 卖家邮费）
     };
 
     // 订单已核销额（关联记录的已知本体 + 分摊）
@@ -194,6 +195,7 @@
 
     sales.forEach(function (sl) {
       s.total_sold += num(sl.quantity);
+      s.total_net += saleNet(sl);
       var p = pMap[sl.purchase_item_id];
       if (!p) return;
       if (sl.cost_settled && sl.cost_base != null) {

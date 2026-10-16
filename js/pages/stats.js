@@ -327,9 +327,9 @@
 
     var cards = [
       { label: costLabel, value: money(costValue), sub: isTotal ? '含估算' : '', cls: '' },
-      { label: '总件数', value: String(s.net_qty), sub: '', cls: '' },
-      { label: '在手', value: String(s.on_hand), sub: '', cls: '' },
-      { label: '在途', value: String(s.in_transit), sub: '', cls: '' },
+      { label: '总件数', value: String(s.total_qty), sub: '购入累计', cls: '' },
+      { label: '卖出', value: String(s.total_sold) + ' 件', sub: '实收 ' + money(s.total_net), cls: '' },
+      { label: '在手', value: String(s.net_qty), sub: '现货 ' + s.on_hand + ' · 在途 ' + s.in_transit, cls: '' },
       { label: '市价总值', value: money(market), sub: '', cls: '' },
       { label: '邮费合计', value: money(shipTotal), sub: '', cls: '' },
       { label: '未计价', value: String(s.unpriced), sub: '未' + s.unknown_qty + ' 估' + s.estimated_qty, cls: '' },

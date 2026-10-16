@@ -785,8 +785,8 @@
     var it = state.items[i];
     if (!it) return;
     if (num(it.sold_quantity) > 0) { UI.toast('该件已有卖出记录，请先在谷子款详情处理后再移除', 'error'); return; }
-    // 移除 = 解除关联：保存时该购入记录 order_id 置空（保留记录，不重复删除）
-    if (it.id != null) state.removed.push(buildItemRec(it));
+    // 移除 = 删除该条购入记录（订单内谷子行即一笔购入记录）
+    if (it.id != null) state.removed.push({ id: it.id, goods_id: it.goods_id });
     state.items.splice(i, 1);
     render();
     if (state.splitMode !== 'manual') applySplit();
@@ -987,9 +987,8 @@
       ops.push({ action: it.id != null ? 'put' : 'add', store: 'purchase_items', value: buildItemRec(it) });
       affected[it.goods_id] = 1;
     });
-    state.removed.forEach(function (rec) {
-      var r = clone(rec); r.order_id = null;
-      ops.push({ action: 'put', store: 'purchase_items', value: r });
+    state.removed.forEach(function (r) {
+      ops.push({ action: 'del', store: 'purchase_items', key: r.id });
       affected[r.goods_id] = 1;
     });
     var ids = Object.keys(affected);

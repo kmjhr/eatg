@@ -610,7 +610,7 @@
       if (sales && sales.length) { UI.toast('该记录已关联卖出记录，请先删除对应卖出记录', 'error'); return; }
       UI.confirmDialog({
         title: '删除购入记录',
-        message: '确认删除该条购入记录？' + (p.order_id != null ? '它将同时从关联订单中移除，并重算订单总额。' : ''),
+        message: '确认删除该条购入记录？' + (p.order_id != null ? '它将同时从关联订单中移除（订单实付价格不变）。' : ''),
         confirmText: '删除',
         danger: true
       }).then(function (ok) {
@@ -619,7 +619,9 @@
         var oid = p.order_id;
         var orderTask = (oid != null) ? S.get('orders', oid) : Promise.resolve(null);
         orderTask.then(function (o) {
-          if (!o || o.is_bundle) return ops;
+          // 订单价格不变：手动实付 / 打包订单删除谷子后不动总额
+          // 仅自动订单（实付随谷子算）重算本体合计，保证订单仍可编辑平衡
+          if (!o || o.is_bundle || o.paid_manual) return ops;
           return S.query('purchase_items', 'order_id', oid).then(function (items) {
             var sum = 0;
             (items || []).forEach(function (it) {

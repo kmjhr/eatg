@@ -371,8 +371,9 @@
       return String(b.order_date || '').localeCompare(String(a.order_date || ''));
     });
     orderList.forEach(function (o) {
+      // 空订单（未关联谷子）也显示：录了实付即算入账单
       var items = filterItems(groups[o.id] || []);
-      if (items.length) blocks.push(orderCardHTML(o, items));
+      blocks.push(orderCardHTML(o, items));
     });
     // 散买
     var looseItems = filterItems(loose);
@@ -425,6 +426,8 @@
         '</div>';
     }).join('');
 
+    var emptyFlag = items.length ? '' : '<div class="order-flags"><span class="tag tag--est">未关联谷子</span></div>';
+
     return '<div class="order-card"' + (order ? ' data-oid="' + order.id + '"' : '') + '>' +
       '<div class="order-head">' +
         '<span class="order-name">' + UI.esc(name) + '</span>' +
@@ -434,6 +437,7 @@
         '<span class="num">' + totalQty + ' 件</span>' +
         '<span class="money">实付 ' + money(paid) + '</span>' +
       '</div>' +
+      emptyFlag +
       '<div class="order-thumbs">' + thumbs + '</div>' +
     '</div>';
   }

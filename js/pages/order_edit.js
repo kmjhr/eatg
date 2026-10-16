@@ -74,6 +74,7 @@
       isBundle: false,
       splitMode: 'per_item',
       bodyMode: 'per_item',
+      paidManual: false,   // 实付总额是否手动填写（不再自动跟随本体+邮费）
       orderImage: null,
       preAddGid: null,
       preAddApplied: false
@@ -117,6 +118,7 @@
         state.order = o;
         state.orderId = Number(o.id);
         state.isNew = false;
+        state.paidManual = !!o.paid_manual;
         state.splitMode = o.split_mode || 'per_item';
         state.bodyMode = 'per_item';
         state.isBundle = !!o.is_bundle;
@@ -144,10 +146,17 @@
       sumAlloc += num(it.shipping_share);
     });
     var goodsTotal = state.isBundle ? num(state.order.goods_total) : sumBody;
-    var paid = goodsTotal + shipFee;
+    // 实付：手动填写则用手动值，否则自动 = 本体合计 + 邮费
+    var paid = state.paidManual ? num(state.order.paid_total) : (goodsTotal + shipFee);
 
     var balanced, diff = 0, pendingBody = 0, pendingShip = 0;
-    if (state.isBundle) {
+    if (state.paidManual) {
+      // 手动实付：允许「余款」（订单还没核销完的钱），关联谷子本体合计与分摊不得超过实付与邮费
+      var overBody = sumBody - paid;
+      var overShip = sumAlloc - shipFee;
+      balanced = (overBody <= 0) && (overShip <= 0);
+      diff = Math.max(overBody, overShip, 0);
+    } else if (state.isBundle) {
       var overBody = sumBody - goodsTotal;
       var overShip = sumAlloc - shipFee;
       balanced = (overBody <= 0) && (overShip <= 0);
@@ -161,9 +170,10 @@
       balanced = (sumBody === goodsTotal) && (sumAlloc === shipFee);
       diff = shipFee - sumAlloc;
     }
+    var remain = paid - sumBody - sumAlloc;
     return {
       goodsTotal: goodsTotal, shipFee: shipFee, sumBody: sumBody, sumAlloc: sumAlloc,
-      paid: paid, count: count, balanced: balanced, diff: diff,
+      paid: paid, count: count, balanced: balanced, diff: diff, remain: remain,
       pendingBody: pendingBody, pendingShip: pendingShip
     };
   }
@@ -218,8 +228,8 @@
       '<div class="agg-grid amount-grid">' + body +
       '<div class="agg-cell"><div class="money-input"><input id="o-ship" class="input amount-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + UI.esc(centsToYuan(state.order.shipping_fee)) + '"><span class="unit">元</span></div>' +
         '<div class="agg-label">邮费</div></div>' +
-      '<div class="agg-cell"><div class="agg-num num" id="o-paid">' + money((num(state.order.goods_total) || 0) + num(state.order.shipping_fee)) + '</div>' +
-        '<div class="agg-label">实付总额（自动=合计+邮费）</div></div>' +
+      '<div class="agg-cell"><div class="money-input"><input id="o-paid-input" class="input amount-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + UI.esc(centsToYuan(state.paidManual ? num(state.order.paid_total) : ((num(state.order.goods_total) || 0) + num(state.order.shipping_fee)))) + '"><span class="unit">元</span></div>' +
+        '<div class="agg-label">实付总额（默认=本体合计+邮费，可手动改）</div></div>' +
       '</div></div>';
   }
 
@@ -329,6 +339,7 @@
     dom.goodsTotal = c.querySelector('#o-goods-total');
     dom.body = c.querySelector('#o-body');
     dom.paid = c.querySelector('#o-paid');
+    dom.paidInput = c.querySelector('#o-paid-input');
     dom.items = c.querySelector('#o-items');
     dom.balance = c.querySelector('#o-balance');
     dom.bmark = c.querySelector('#o-bmark');
@@ -366,12 +377,24 @@
   function updateAmounts() {
     var m = computeModel();
     if (!state.isBundle && dom.body) dom.body.textContent = money(m.goodsTotal);
-    if (dom.paid) dom.paid.textContent = money(m.paid);
+    if (!state.paidManual && dom.paidInput) dom.paidInput.value = centsToYuan(m.paid);
     updateBalance(m);
   }
 
   function updateBalance(m) {
     if (!dom.balance) return;
+    if (state.paidManual) {
+      if (m.balanced) {
+        dom.balance.classList.remove('is-bad');
+        dom.bmark.textContent = '✓';
+        dom.btext.textContent = '账目平衡 · 订单余款 ' + money(Math.max(0, m.remain)) + '（卖出/关联谷子后自动核销）';
+      } else {
+        dom.balance.classList.add('is-bad');
+        dom.bmark.textContent = '!';
+        dom.btext.textContent = '关联谷子超订单实付 ' + money(m.diff) + '：请调低谷子价格或实付总额';
+      }
+      return;
+    }
     if (m.balanced) {
       dom.balance.classList.remove('is-bad');
       dom.bmark.textContent = '✓';
@@ -417,6 +440,10 @@
     if (dom.note) state.order.note = dom.note.value;
     if (dom.ship) state.order.shipping_fee = centsOr(dom.ship, num(state.order.shipping_fee));
     if (dom.goodsTotal) state.order.goods_total = centsOr(dom.goodsTotal, num(state.order.goods_total));
+    if (dom.paidInput) {
+      var pc = yuanToCents(dom.paidInput.value);
+      if (pc != null && !isNaN(pc)) { state.order.paid_total = pc; state.paidManual = true; }
+    }
   }
 
   function readItemFromRow(i) {
@@ -771,6 +798,11 @@
     });
     if (dom.ship) on(dom.ship, 'input', function () { state.order.shipping_fee = centsOr(dom.ship, 0); updateAmounts(); });
     if (dom.goodsTotal) on(dom.goodsTotal, 'input', function () { state.order.goods_total = centsOr(dom.goodsTotal, 0); updateAmounts(); });
+    if (dom.paidInput) on(dom.paidInput, 'input', function () {
+      var pc = yuanToCents(dom.paidInput.value);
+      if (pc != null && !isNaN(pc)) { state.order.paid_total = pc; state.paidManual = true; }
+      updateAmounts();
+    });
     if (dom.channel) on(dom.channel, 'change', function () { state.order.channel = dom.channel.value; });
     if (dom.date) on(dom.date, 'change', function () { state.order.order_date = dom.date.value; });
     if (dom.file) on(dom.file, 'change', function () { handleFile(dom.file.files && dom.file.files[0]); dom.file.value = ''; });
@@ -858,6 +890,7 @@
     rec.goods_total = m.goodsTotal;
     rec.shipping_fee = m.shipFee;
     rec.paid_total = m.paid;
+    rec.paid_manual = !!state.paidManual;
     rec.currency = state.order.currency || 'CNY';
     rec.split_mode = state.splitMode;
     rec.is_bundle = !!state.isBundle;

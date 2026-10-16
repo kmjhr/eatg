@@ -75,7 +75,8 @@
       goodsList: [],
       enums: { channel: [], sale_channel: [] },
       splitMode: 'per_item',
-      fromGoodsId: null       // 从谷子详情批量卖出进入
+      fromGoodsId: null,      // 从谷子详情批量卖出进入
+      orders: []              // 全部购入订单（用于卖出后补录关联）
     };
   }
 
@@ -651,7 +652,8 @@
       return refreshAggs(Object.keys(gids).map(Number));
     }).then(function () {
       UI.toast('卖出订单已保存', 'success');
-      goBack();
+      var pids = state.items.map(function (it) { return it.purchase_item_id; });
+      offerLinkPurchases(pids, goBack);
     });
   }
 
@@ -705,7 +707,7 @@
       return refreshAggs(it.goods_id);
     }).then(function () {
       UI.toast('已保存卖出记录', 'success');
-      goBack();
+      offerLinkPurchases([it.purchase_item_id], goBack);
     }).catch(function (err) {
       setBusy(false);
       if (!(err && err.expected)) console.error('[EATG] 保存卖出记录失败', err);
@@ -782,6 +784,44 @@
 
   function setBusy(b) { state.busy = b; var btn = document.getElementById('o-save'); if (btn) btn.disabled = b; }
 
+  /** 卖出保存后：对未关联订单的购入记录提供「补录购入订单」入口（订单余款随之核销） */
+  function offerLinkPurchases(pids, done) {
+    pids = pids.filter(function (v, i, a) { return a.indexOf(v) === i && v != null; })
+      .filter(function (pid) { var p = state.purchasesById[pid]; return p && p.order_id == null; });
+    if (!pids.length || !state.orders.length) { done(); return; }
+    var rows = state.orders.map(function (o) {
+      return '<button type="button" class="opt-row" data-oid="' + o.id + '"><span>' + UI.esc(o.order_name || '未命名订单') + '</span>' +
+        '<span class="muted">' + UI.esc(o.order_date || '—') + ' · ' + UI.esc(o.channel || '') + '</span></button>';
+    }).join('');
+    var ref = UI.sheet({
+      title: '补录购入订单',
+      bodyHTML: '<p class="hint">本次卖出的 ' + pids.length + ' 条购入记录还没关联订单。关联后该订单的「余款」会自动核销减少。</p>' +
+        '<div class="opt-list">' + rows +
+        '<button type="button" class="opt-row" data-act="skip"><span>暂不关联</span><span class="opt-check">›</span></button>' +
+        '</div>'
+    });
+    function finish() { ref.close(); done(); }
+    ref.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-oid],[data-act="skip"]');
+      if (!b) return;
+      if (b.dataset.act === 'skip') { finish(); return; }
+      var oid = Number(b.dataset.oid);
+      var ops = pids.map(function (pid) {
+        var p = state.purchasesById[pid];
+        var rec = clone(p); rec.order_id = oid;
+        return { action: 'put', store: 'purchase_items', value: rec };
+      });
+      S.bulk('purchase_items', ops).then(function () {
+        UI.toast('已关联订单，余款自动核销', 'success');
+        finish();
+      }).catch(function (err) {
+        if (!(err && err.expected)) console.error('[EATG] 补录订单失败', err);
+        UI.toast('补录失败：' + (err && err.message || err), 'error');
+        finish();
+      });
+    });
+  }
+
   function goBack() {
     if (EATG.app && EATG.app.navigate) EATG.app.navigate('#/sales');
   }
@@ -843,7 +883,8 @@
       S.getAll('goods'),
       S.getAll('purchase_items'),
       S.get('enums', 'channel'),
-      S.get('enums', 'sale_channel')
+      S.get('enums', 'sale_channel'),
+      S.getAll('orders')
     ]).then(function (r) {
       state.goodsById = {};
       (r[0] || []).forEach(function (g) { state.goodsById[g.id] = g; });
@@ -851,6 +892,9 @@
       (r[1] || []).forEach(function (p) { state.purchasesById[p.id] = p; });
       state.enums.channel = (r[2] && r[2].values) || [];
       state.enums.sale_channel = (r[3] && r[3].values) || [];
+      state.orders = (r[4] || []).slice().sort(function (a, b) {
+        return String(b.order_date || '').localeCompare(String(a.order_date || '')) || (Number(b.id) - Number(a.id));
+      });
       state.fromGoodsId = params.get('goods_id') ? Number(params.get('goods_id')) : null;
 
       if (sid) {

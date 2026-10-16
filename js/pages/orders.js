@@ -62,7 +62,15 @@
     var body = num(o.goods_total);
     var paid = (o.paid_total != null) ? num(o.paid_total) : (body + ship);
     var count = items.reduce(function (a, p) { return a + num(p.quantity); }, 0);
-    return { items: items, ship: ship, body: body, paid: paid, count: count, status: repStatus(items), bundle: !!o.is_bundle };
+    // 已核销 = 已填单价的件（本体×数量） + 邮费分摊；余款 = 实付 − 已核销
+    var alloc = items.reduce(function (a, p) {
+      var q = num(p.quantity);
+      var b = (p.unit_price != null) ? num(p.unit_price) * q : 0;
+      return a + b + num(p.shipping_share);
+    }, 0);
+    var remain = paid - alloc;
+    return { items: items, ship: ship, body: body, paid: paid, count: count, remain: remain,
+      paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle };
   }
 
   function inChannel(o) {
@@ -147,6 +155,7 @@
               '<span>本体 <b class="num">' + money(st.body) + '</b></span>' +
               '<span>邮费 <b class="num">' + money(st.ship) + '</b></span>' +
               '<span>实付 <b class="num">' + money(st.paid) + '</b></span>' +
+              (st.paidManual ? '<span>余款 <b class="num">' + money(Math.max(0, st.remain)) + '</b></span>' : '') +
             '</div>' +
             '<div class="order-flags">' + flags + '</div>' +
           '</div>' +

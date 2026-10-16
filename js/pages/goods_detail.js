@@ -520,25 +520,21 @@
     }).join('');
     var ref = UI.sheet({
       title: '加入订单（合单）',
-      bodyHTML: '<div class="opt-list">' +
-        '<button type="button" class="opt-row" data-act="new-order"><span>＋ 新建订单</span><span class="opt-check">›</span></button>' +
-        (orders.length ? rows : '<p class="empty-line">还没有订单，可先新建一笔</p>') +
-        '</div>',
+      bodyHTML: (orders.length
+        ? '<p class="hint">把本谷子的未关联购入记录并入一笔已有订单（记录数不变，订单余款自动核销）。</p><div class="opt-list">' + rows + '</div>'
+        : '<p class="hint">把本谷子的未关联购入记录并入一笔已有订单（记录数不变，订单余款自动核销）。</p>' +
+          '<p class="empty-line">还没有订单，请先到「订单」页新建一笔再回来关联</p>'),
       footerHTML: '<button type="button" class="btn btn--secondary" data-act="close">关闭</button>'
     });
     ref.body.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-oid],[data-act="new-order"]');
+      var b = e.target.closest('[data-oid]');
       if (!b) return;
       ref.close();
-      if (b.dataset.act === 'new-order') {
-        go('#/order/edit?mode=new&add_gid=' + state.goodsId);
-      } else {
-        var oid = Number(b.dataset.oid);
-        // 已有未关联订单的购入记录 → 直接并入（不新增记录）；没有则走订单编辑页预填
-        var pendings = state.purchases.filter(function (p) { return p.order_id == null; });
-        if (pendings.length) openMergePickSheet(oid, pendings);
-        else go('#/order/edit?id=' + oid + '&add_gid=' + state.goodsId);
-      }
+      var oid = Number(b.dataset.oid);
+      // 已有未关联订单的购入记录 → 直接并入（不新增记录）；没有则走订单编辑页预填
+      var pendings = state.purchases.filter(function (p) { return p.order_id == null; });
+      if (pendings.length) openMergePickSheet(oid, pendings);
+      else go('#/order/edit?id=' + oid + '&add_gid=' + state.goodsId);
     });
     ref.foot.addEventListener('click', function (e) {
       if (e.target.closest('[data-act="close"]')) ref.close();

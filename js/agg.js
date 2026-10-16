@@ -177,14 +177,18 @@
       else { s.unknown_qty += q; s.unpriced += q; }
     });
 
-    // 订单未核销支出：实付 − 已关联谷子核销（含未知池/未关联谷子的空余款），计入总投入
+    // 订单未核销支出：实付 − 已关联谷子核销（含未知池/未关联谷子的空余款）
+    // 按订单实付价格状态分桶：已知→已填写投入；估计→估算投入；未知→不计
     orders.forEach(function (o) {
       var paid = num(o.paid_total);
       if (!(paid > 0)) return;
+      var ps = o.price_status || 'filled';
+      if (ps === 'unknown') return;
       var unalloc = paid - (allocByOrder[Number(o.id)] || 0);
       if (unalloc > 0) {
         s.order_unalloc += unalloc;
-        s.filled_cost += unalloc;
+        if (ps === 'estimated') s.estimated_cost += unalloc;
+        else s.filled_cost += unalloc;
       }
     });
 

@@ -110,7 +110,8 @@
           order_date: U.todayStr(),
           currency: (EATG.runtime && EATG.runtime.defaultCurrency) || 'CNY',
           goods_total: 0,
-          shipping_fee: 0
+          shipping_fee: 0,
+          price_status: 'filled'     // 订单实付价格状态：filled 已知 / estimated 估计 / unknown 未知
         };
         state.splitMode = 'per_item';
         state.bodyMode = 'per_item';
@@ -122,6 +123,7 @@
         var o = rr[0];
         if (!o) throw expectedError('未找到该订单（id=' + id + '）');
         state.order = o;
+        if (!state.order.price_status) state.order.price_status = 'filled';
         state.orderId = Number(o.id);
         state.isNew = false;
         state.paidManual = !!o.paid_manual;
@@ -152,11 +154,15 @@
       sumAlloc += num(it.shipping_share);
     });
     var goodsTotal = state.isBundle ? num(state.order.goods_total) : sumBody;
-    // 实付：手动填写则用手动值，否则自动 = 本体合计 + 邮费
-    var paid = state.paidManual ? num(state.order.paid_total) : (goodsTotal + shipFee);
+    var ps = state.order.price_status || 'filled';
+    // 实付：手动填写则用手动值，否则自动 = 本体合计 + 邮费；未知 → null（不计账）
+    var paid = (ps === 'unknown') ? null : (state.paidManual ? num(state.order.paid_total) : (goodsTotal + shipFee));
 
     var balanced, diff = 0, pendingBody = 0, pendingShip = 0;
-    if (state.paidManual) {
+    if (ps === 'unknown') {
+      // 实付价格未知：不校验金额、不核销
+      balanced = true;
+    } else if (state.paidManual) {
       // 手动实付：允许「余款」（订单还没核销完的钱），关联谷子本体合计与分摊不得超过实付与邮费
       var overBody = sumBody - paid;
       var overShip = sumAlloc - shipFee;
@@ -176,7 +182,7 @@
       balanced = (sumBody === goodsTotal) && (sumAlloc === shipFee);
       diff = shipFee - sumAlloc;
     }
-    var remain = paid - sumBody - sumAlloc;
+    var remain = (paid == null) ? 0 : paid - sumBody - sumAlloc;
     return {
       goodsTotal: goodsTotal, shipFee: shipFee, sumBody: sumBody, sumAlloc: sumAlloc,
       paid: paid, count: count, balanced: balanced, diff: diff, remain: remain,
@@ -234,8 +240,13 @@
       '<div class="agg-grid amount-grid">' + body +
       '<div class="agg-cell"><div class="money-input"><input id="o-ship" class="input amount-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + UI.esc(centsToYuan(state.order.shipping_fee)) + '"><span class="unit">元</span></div>' +
         '<div class="agg-label">邮费</div></div>' +
-      '<div class="agg-cell"><div class="money-input"><input id="o-paid-input" class="input amount-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="' + UI.esc(centsToYuan(state.paidManual ? num(state.order.paid_total) : ((num(state.order.goods_total) || 0) + num(state.order.shipping_fee)))) + '"><span class="unit">元</span></div>' +
-        '<div class="agg-label">实付总额（默认=本体合计+邮费，可手动改）</div></div>' +
+      '<div class="agg-cell"><div class="money-input"><input id="o-paid-input" class="input amount-input" type="text" inputmode="decimal" autocomplete="off" placeholder="' + (state.order.price_status === 'unknown' ? '价格未知' : '0.00') + '"' + (state.order.price_status === 'unknown' ? ' disabled' : '') + ' value="' + UI.esc(state.order.price_status === 'unknown' ? '' : centsToYuan(state.paidManual ? num(state.order.paid_total) : ((num(state.order.goods_total) || 0) + num(state.order.shipping_fee)))) + '"><span class="unit">元</span></div>' +
+        '<div class="agg-label">实付总额（默认=本体合计+邮费，可手动改）</div>' +
+        '<div class="chip-select chip-select--sm" id="o-pstat">' +
+          modeChip('filled', '已知', state.order.price_status, 'pstat') +
+          modeChip('estimated', '估计', state.order.price_status, 'pstat') +
+          modeChip('unknown', '未知', state.order.price_status, 'pstat') +
+        '</div></div>' +
       '</div></div>';
   }
 
@@ -383,12 +394,23 @@
   function updateAmounts() {
     var m = computeModel();
     if (!state.isBundle && dom.body) dom.body.textContent = money(m.goodsTotal);
-    if (!state.paidManual && dom.paidInput) dom.paidInput.value = centsToYuan(m.paid);
+    if (dom.paidInput) {
+      var unk = (state.order.price_status || 'filled') === 'unknown';
+      dom.paidInput.disabled = unk;
+      if (unk) dom.paidInput.value = '';
+      else if (!state.paidManual) dom.paidInput.value = centsToYuan(m.paid);
+    }
     updateBalance(m);
   }
 
   function updateBalance(m) {
     if (!dom.balance) return;
+    if ((state.order.price_status || 'filled') === 'unknown') {
+      dom.balance.classList.remove('is-bad');
+      dom.bmark.textContent = '✓';
+      dom.btext.textContent = '实付价格未知：金额暂不计入账目，可稍后补录为已知/估计';
+      return;
+    }
     if (state.paidManual) {
       if (m.balanced) {
         dom.balance.classList.remove('is-bad');
@@ -824,6 +846,8 @@
 
   function bind() {
     on(dom.page, 'click', function (e) {
+      var pstatBtn = e.target.closest('[data-pstat]');
+      if (pstatBtn) { setOrderPriceStatus(pstatBtn.dataset.pstat); return; }
       var modeBtn = e.target.closest('[data-mode]');
       if (modeBtn) { selectMode(modeBtn.dataset.mode); return; }
       var bmodeBtn = e.target.closest('[data-bmode]');
@@ -878,6 +902,15 @@
     if (f.dataset.f === 'share') { state.splitMode = 'manual'; updateModeChips(); updateHint(); }
     updateSum(i);
     updateAmounts();
+  }
+
+  /** 订单实付价格状态：已知/估计/未知；未知时清空实付并禁用输入 */
+  function setOrderPriceStatus(ps) {
+    if (ps === state.order.price_status) return;
+    state.order.price_status = ps;
+    if (ps === 'unknown') { state.order.paid_total = null; state.paidManual = false; }
+    render();
+    UI.toast(ps === 'unknown' ? '实付未知：金额暂不计入账目' : (ps === 'estimated' ? '实付按估算计入账目' : '实付按已填写计入账目'), 'info');
   }
 
   function selectMode(mode) {
@@ -951,6 +984,7 @@
     rec.goods_total = m.goodsTotal;
     rec.shipping_fee = m.shipFee;
     rec.paid_total = m.paid;
+    rec.price_status = state.order.price_status || 'filled';
     rec.paid_manual = !!state.paidManual;
     rec.currency = state.order.currency || 'CNY';
     rec.split_mode = state.splitMode;

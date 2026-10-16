@@ -428,15 +428,18 @@
     }).join('');
 
     var emptyFlag = items.length ? '' : '<div class="order-flags"><span class="tag tag--est">未关联谷子</span></div>';
+    var ps = (order && order.price_status) || 'filled';
+    var psTag = ps === 'unknown' ? '<span class="tag tag--unknown">价格未知</span>'
+      : (ps === 'estimated' ? '<span class="tag tag--est">估算</span>' : '');
 
     return '<div class="order-card"' + (order ? ' data-oid="' + order.id + '"' : '') + '>' +
       '<div class="order-head">' +
         '<span class="order-name">' + UI.esc(name) + '</span>' +
         '<span class="order-meta">' + UI.esc(meta) + '</span>' +
       '</div>' +
-      '<div class="order-stats">' +
+      '<div class="order-stats">' + psTag +
         '<span class="num">' + totalQty + ' 件</span>' +
-        '<span class="money">实付 ' + money(paid) + '</span>' +
+        '<span class="money">实付 ' + (ps === 'unknown' ? '—' : money(paid)) + '</span>' +
       '</div>' +
       emptyFlag +
       '<div class="order-thumbs">' + thumbs + '</div>' +

@@ -77,7 +77,9 @@
     var remain = paid - alloc - unknownSold;
     var unknownQty = items.reduce(function (a, p) { return a + (p.unit_price == null ? num(p.quantity) : 0); }, 0);
     return { items: items, ship: ship, body: body, paid: paid, count: count, remain: remain,
-      unknownQty: unknownQty, paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle };
+      unknownQty: unknownQty, paidManual: !!o.paid_manual, status: repStatus(items), bundle: !!o.is_bundle,
+      ps: o.price_status || 'filled'      // 订单实付价格状态
+    };
   }
 
   function inChannel(o) {
@@ -155,7 +157,9 @@
     var pick = state.selectMode
       ? '<button type="button" class="pick' + (sel ? ' is-on' : '') + '" data-pick="' + o.id + '" aria-label="选择订单"></button>'
       : '';
-    var flags = (st.bundle ? '<span class="tag tag--bund">打包</span>' : '') + badgeHTML(st.status);
+    var psTag = st.ps === 'unknown' ? '<span class="tag tag--unknown">价格未知</span>'
+      : (st.ps === 'estimated' ? '<span class="tag tag--est">估算</span>' : '');
+    var flags = psTag + (st.bundle ? '<span class="tag tag--bund">打包</span>' : '') + badgeHTML(st.status);
     return '<article class="order-card order-card--list' + (sel ? ' is-selected' : '') + '" data-oid="' + o.id + '">' +
         '<div class="order-row">' + pick +
           '<div class="order-body">' +
@@ -167,8 +171,8 @@
             '<div class="order-stats">' +
               '<span>本体 <b class="num">' + money(st.body) + '</b></span>' +
               '<span>邮费 <b class="num">' + money(st.ship) + '</b></span>' +
-              '<span>实付 <b class="num">' + money(st.paid) + '</b></span>' +
-              (st.paidManual ? '<span>余款 <b class="num">' + money(Math.max(0, st.remain)) + '</b></span>' : '') +
+              '<span>实付 <b class="num">' + (st.ps === 'unknown' ? '—' : money(st.paid)) + '</b></span>' +
+              (st.paidManual && st.ps !== 'unknown' ? '<span>余款 <b class="num">' + money(Math.max(0, st.remain)) + '</b></span>' : '') +
             '</div>' +
             (st.unknownQty > 0 ? '<div class="order-flags"><span class="tag tag--unknown">价格未知 ' + st.unknownQty + ' 件</span></div>' : '') +
             '<div class="order-flags">' + flags + '</div>' +

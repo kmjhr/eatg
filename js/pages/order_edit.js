@@ -758,7 +758,7 @@
       title: '关联已有购入记录',
       bodyHTML: '<p class="hint">该谷子已有未关联订单的购入记录：复用可避免重复记账（记录数不变，订单与谷子款共用一条记录）。</p>' +
         '<div class="opt-list">' + rows +
-        '<button type="button" class="opt-row" data-act="new"><span>＋ 新建一条购入记录</span><span class="opt-check">›</span></button>' +
+        '<button type="button" class="opt-row" data-act="new"><span>＋ 在该谷子款下新建一条购入记录</span><span class="muted">复购/多批次 · 不新建谷子款</span><span class="opt-check">›</span></button>' +
         '</div>'
     });
     ref.body.addEventListener('click', function (e) {

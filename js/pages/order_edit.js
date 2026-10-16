@@ -883,6 +883,7 @@
     var q = (EATG.runtime && EATG.runtime.imageQuality) || 0.8;
     U.compressImage(file, { maxEdge: 1920, quality: q, stripExif: true }).then(function (dataUrl) {
       if (state.destroyed) return;
+      syncInputs();
       state.orderImage = dataUrl;
       render();
       UI.toast('已添加订单截图', 'success');
@@ -940,6 +941,8 @@
       if (pc != null && !isNaN(pc)) { state.order.paid_total = pc; state.paidManual = true; }
       updateAmounts();
     });
+    if (dom.name) on(dom.name, 'input', function () { state.order.order_name = dom.name.value; });
+    if (dom.note) on(dom.note, 'input', function () { state.order.note = dom.note.value; });
     if (dom.channel) on(dom.channel, 'change', function () { state.order.channel = dom.channel.value; });
     if (dom.date) on(dom.date, 'change', function () { state.order.order_date = dom.date.value; });
     if (dom.file) on(dom.file, 'change', function () { handleFile(dom.file.files && dom.file.files[0]); dom.file.value = ''; });

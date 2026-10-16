@@ -6,7 +6,7 @@
    ========================================================================== */
 'use strict';
 
-var CACHE = 'eatg-shell-v47';
+var CACHE = 'eatg-shell-v48';
 var PRECACHE = [
   './',
   './index.html',

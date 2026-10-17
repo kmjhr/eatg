@@ -465,7 +465,11 @@
 
   function renderChars() {
     var on = state.characterIds;
-    var html = state.characters.map(function (c) {
+    // 只显示谷子侧角色（gallery===false）；编辑模式兼容已引用角色（即使属于图鉴侧，避免选中项消失）
+    var chars = state.characters.filter(function (c) {
+      return c && (c.gallery === false || on.indexOf(Number(c.id)) !== -1);
+    });
+    var html = chars.map(function (c) {
       var sel = on.indexOf(Number(c.id)) !== -1;
       return '<button type="button" class="opt-chip' + (c.is_favorite ? ' is-fav' : '') + (sel ? ' is-on' : '') + '" data-char="' + c.id + '">' + UI.esc(c.name) + '</button>';
     }).join('');

@@ -162,7 +162,8 @@
       lost_qty: 0, lost_loss: 0,       // 丢失：件数与损失（成本单列，投入不变）
       unpriced: 0, unknown_qty: 0, estimated_qty: 0,
       order_unalloc: 0,   // 订单未核销支出（实付 − 已关联谷子核销），已计入 filled_cost
-      total_net: 0        // 卖出实收总额：Σ saleNet（售价×数量 − 手续费 − 卖家邮费）
+      total_net: 0,       // 卖出实收总额：Σ saleNet（售价×数量 − 手续费 − 卖家邮费）
+      order_count: 0, order_linked: 0, order_no_item: 0  // 订单数：总数/关联谷子数/纯金额订单数
     };
 
     // 订单已核销额（关联记录的已知本体 + 分摊）
@@ -193,17 +194,22 @@
     // 订单未核销支出：实付 − 已关联谷子核销（含未知池/未关联谷子的空余款）
     // 按订单实付价格状态分桶：已知→已填写投入；估计→估算投入；未知→不计
     orders.forEach(function (o) {
+      var oid = Number(o.id);
+      // 关联谷子：存在该订单的核销记录（含价格未知件，按 key 判定）
+      if (allocByOrder[oid] !== undefined) s.order_linked++;
       var paid = num(o.paid_total);
       if (!(paid > 0)) return;
       var ps = o.price_status || 'filled';
       if (ps === 'unknown') return;
-      var unalloc = paid - (allocByOrder[Number(o.id)] || 0);
+      var unalloc = paid - (allocByOrder[oid] || 0);
       if (unalloc > 0) {
         s.order_unalloc += unalloc;
         if (ps === 'estimated') s.estimated_cost += unalloc;
         else s.filled_cost += unalloc;
       }
     });
+    s.order_count = orders.length;
+    s.order_no_item = s.order_count - s.order_linked;
 
     sales.forEach(function (sl) {
       s.total_sold += num(sl.quantity);

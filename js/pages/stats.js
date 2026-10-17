@@ -328,6 +328,7 @@
     var cards = [
       { label: costLabel, value: money(costValue), sub: isTotal ? '含估算' : '', cls: '' },
       { label: '总件数', value: String(s.total_qty), sub: '购入累计', cls: '' },
+      { label: '订单数', value: String(s.order_count) + ' 单', sub: '含谷子 ' + s.order_linked + ' · 纯金额 ' + s.order_no_item, cls: '' },
       { label: '卖出', value: String(s.total_sold) + ' 件', sub: '实收 ' + money(s.total_net), cls: '' },
       { label: '在手', value: String(s.net_qty), sub: '现货 ' + s.on_hand + ' · 在途 ' + s.in_transit, cls: '' },
       { label: '丢失', value: String(s.lost_qty) + ' 件', sub: s.lost_loss > 0 ? ('损失 ' + money(s.lost_loss)) : '总投入不变', cls: '' },

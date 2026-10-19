@@ -2,7 +2,7 @@
    一咕（EATG）· 统计页（js/pages/stats.js）
    实现：《页面线框与UI规范》P19 +《业务规则》§5
    路由：#/stats
-   内容：1 总览卡片（总花费/总件数/在手/在途/市价总值/邮费合计/未计价/总盈利/估算盈利）
+   内容：1 总览卡片（总花费[净=投入−实收]/总投入/总件数/在手/在途/市价总值/邮费合计/未计价/总盈利/估算盈利）
         2 口径切换：分开统计（已填写/估算/未知三栏，默认）/ 总统计（含估算）
         3 Canvas 图表：IP占比/类型占比/状态占比环形、月度花费柱状、月度邮费占比
         4 盈利排行：维度切换（谷子款/角色/IP），filled 口径，亏损标红，估算单列
@@ -322,11 +322,15 @@
     var shipTotal = totalShipping(state.model);
     var market = totalMarketPrice(state.model);
     var isTotal = state.view === 'total';
-    var costValue = isTotal ? (num(s.filled_cost) + num(s.estimated_cost)) : num(s.filled_cost);
+    // 总花费（净）= 投入 − 实收；投入按口径（已填写 / 含估算），实收 = Σ卖出实收
+    var invest = isTotal ? (num(s.filled_cost) + num(s.estimated_cost)) : num(s.filled_cost);
+    var netSpend = invest - num(s.total_net);
     var costLabel = isTotal ? '总花费（含估算）' : '总花费（已填写）';
+    var costSub = '投入 ' + money(invest) + ' − 实收 ' + money(s.total_net);
 
     var cards = [
-      { label: costLabel, value: money(costValue), sub: isTotal ? '含估算' : '', cls: '' },
+      { label: costLabel, value: money(netSpend), sub: costSub, cls: netSpend < 0 ? 'up' : '' },
+      { label: '总投入', value: money(invest), sub: isTotal ? '含估算（未减实收）' : '已填写（未减实收）', cls: '' },
       { label: '总件数', value: String(s.total_qty), sub: '购入累计', cls: '' },
       { label: '订单数', value: String(s.order_count) + ' 单', sub: '含谷子 ' + s.order_linked + ' · 纯金额 ' + s.order_no_item, cls: '' },
       { label: '卖出', value: String(s.total_sold) + ' 件', sub: '实收 ' + money(s.total_net), cls: '' },

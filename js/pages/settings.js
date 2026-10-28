@@ -159,7 +159,10 @@
         '拍照批量录入时「自动识别」用它给谷子出框；留空则回退本地 OCR') +
       rowHTML('模型名',
         '<input id="stg-vis-model" type="text" class="input" value="' + esc(v.model || '') + '">',
-        '默认 glm-4.6v-flash（智谱免费档）') +
+        '默认 glm-4.1v-thinking-flash（智谱免费）') +
+      rowHTML('CORS 代理地址',
+        '<input id="stg-vis-proxy" type="text" class="input" value="' + esc(v.proxyUrl || '') + '" placeholder="https://xxx.workers.dev">',
+        '智谱 API 浏览器跨域被拦时填；留空直连。自建 Cloudflare Worker 代理') +
       '<div class="stg-actions">' +
         '<button id="stg-vis-save" type="button" class="btn btn--primary">保存视觉识别设置</button>' +
       '</div>';
@@ -254,7 +257,8 @@
     var v = {
       url: (document.getElementById('stg-vis-url') || {}).value || '',
       key: (document.getElementById('stg-vis-key') || {}).value || '',
-      model: (document.getElementById('stg-vis-model') || {}).value || ''
+      model: (document.getElementById('stg-vis-model') || {}).value || '',
+      proxyUrl: (document.getElementById('stg-vis-proxy') || {}).value || ''
     };
     S.setSetting('vision_api', v).then(function () {
       state.vision_api = v;

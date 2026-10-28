@@ -16,7 +16,8 @@
   var DEFAULTS = {
     url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     model: 'glm-4.1v-thinking-flash',
-    key: ''
+    key: '',
+    proxyUrl: ''
   };
 
   var PROMPT = '这是一张桌面上摆放「二次元动漫周边商品」的照片（这种周边在中文黑话里叫"谷子"）。' +
@@ -129,6 +130,11 @@
         cfg = cfg || {};
         var url = cfg.url || DEFAULTS.url;
         var key = cfg.key || DEFAULTS.key;
+        var proxy = cfg.proxyUrl || DEFAULTS.proxyUrl || '';
+        if (proxy) {
+          proxy = proxy.replace(/\/+$/, '');
+          url = proxy + '/api/paas/v4/chat/completions';
+        }
         if (!key) { var e = new Error('未配置视觉识别 API Key'); e.code = 'NO_KEY'; throw e; }
 
         var primary = cfg.model || DEFAULTS.model;

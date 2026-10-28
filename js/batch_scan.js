@@ -161,7 +161,9 @@
       '<div class="bs-foot">' +
         '<button type="button" class="btn btn--secondary" data-act="pick">相册 / 拍照</button>' +
         '<button type="button" class="btn btn--secondary" data-act="auto">自动识别</button>' +
-        '<button type="button" class="btn btn--secondary" data-act="del-box">删选中框</button>' +
+        '<button type="button" class="btn btn--secondary" data-act="add-box">加框</button>' +
+        '<button type="button" class="btn btn--secondary" data-act="del-box">删选中</button>' +
+        '<button type="button" class="btn btn--secondary" data-act="clear-boxes">清空</button>' +
         '<button type="button" class="btn btn--primary" data-act="gen">生成录入</button>' +
       '</div>';
     document.body.appendChild(el);
@@ -305,7 +307,7 @@
       ctx.font = '12px sans-serif';
       ctx.fillText('#' + (i + 1), x + 4, y + 14);
       if (sel) {
-        var s = 10;
+        var s = 14;
         [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (p) {
           ctx.fillRect(x + p[0] * w - s / 2, y + p[1] * h - s / 2, s, s);
         });
@@ -324,7 +326,7 @@
     var i = view.sel;
     if (i >= 0) {
       var b = view.boxes[i];
-      var pad = 0.02;
+      var pad = 0.04;
       var handles = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]];
       for (var k = 0; k < handles.length; k++) {
         if (Math.abs(p.x - handles[k][0]) < pad && Math.abs(p.y - handles[k][1]) < pad) {
@@ -686,6 +688,20 @@
         } else {
           UI.toast('请先点选一个框再删除', 'info');
         }
+      }
+      else if (b.dataset.act === 'add-box') {
+        if (!view || !view.img || view.busy) return;
+        if (view.boxes.length >= MAX_BOXES) { UI.toast('最多 ' + MAX_BOXES + ' 个框', 'error'); return; }
+        view.boxes.push({ x: 0.35, y: 0.3, w: 0.3, h: 0.4, text: null });
+        view.sel = view.boxes.length - 1;
+        draw();
+      }
+      else if (b.dataset.act === 'clear-boxes') {
+        if (!view || !view.boxes.length) return;
+        if (!confirm('清空所有 ' + view.boxes.length + ' 个框？')) return;
+        view.boxes = [];
+        view.sel = -1;
+        draw();
       }
       else if (b.dataset.act === 'gen') generate();
     });

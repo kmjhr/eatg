@@ -442,7 +442,7 @@
 
     // 优先：视觉大模型「数个数 + 给框」（已在设置页配置 Key 时）
     setProgress('正在调用视觉识别…', 10);
-    Promise.resolve(EATG.vision && EATG.vision.detectBoxes(cut.url) || Promise.reject({ code: 'NO_KEY' }))
+    Promise.resolve(EATG.vision && EATG.vision.detectBoxes(cut.url, cut.w, cut.h) || Promise.reject({ code: 'NO_KEY' }))
       .then(function (boxes) {
         if (!view || view.destroyed) return;
         if (!boxes || !boxes.length) {

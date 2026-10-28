@@ -440,7 +440,7 @@
     view.busy = true;
     setBusy(true);
 
-    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, 2048);
+    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, 1280);
 
     // 优先：视觉大模型「数个数 + 给框」（已在设置页配置 Key 时）
     setProgress('正在调用视觉识别…', 10);
@@ -464,7 +464,7 @@
           alert('【视觉识别】还没配 Key\n\n去「我的 → 设置 → 视觉识别」填智谱 Key 后才能自动数谷子。\n现在回退到本地吊牌文字识别。');
         } else {
           console.warn('[EATG] 视觉出框失败，回退本地 OCR', err);
-          alert('【视觉识别调用失败】\n\n错误：' + msg + (err && err.status ? ('\nHTTP ' + err.status) : '') + '\n\n可能原因：\n1. 模型名不对（应填 glm-4.1v-thinking-flash）\n2. Key 错或没余额\n3. 网络不通\n\n现在回退到本地吊牌文字识别。');
+          alert('【视觉识别调用失败】\n\n错误：' + msg + (err && err.status ? ('\nHTTP ' + err.status) : '') + '\n\n可能原因：\n1. 模型名不对（应填 glm-4.1v-thinking-flash）\n2. Key 错或没余额\n3. 手机网络到智谱不通（5G 常被拦截，建议切 WiFi 重试）\n\n现在回退到本地吊牌文字识别。');
         }
         return ocrFallback();
       })
@@ -514,7 +514,7 @@
     cv.width = cw; cv.height = ch;
     var cx = cv.getContext('2d');
     cx.drawImage(img, bx, by, bw, bh, 0, 0, cw, ch);
-    return { url: cv.toDataURL('image/jpeg', 0.95), w: cw, h: ch };
+    return { url: cv.toDataURL('image/jpeg', 0.8), w: cw, h: ch };
   }
 
   // ---- 关键词预填 ----

@@ -440,7 +440,7 @@
     view.busy = true;
     setBusy(true);
 
-    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, 1600);
+    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, 2048);
 
     // 优先：视觉大模型「数个数 + 给框」（已在设置页配置 Key 时）
     setProgress('正在调用视觉识别…', 10);
@@ -514,7 +514,7 @@
     cv.width = cw; cv.height = ch;
     var cx = cv.getContext('2d');
     cx.drawImage(img, bx, by, bw, bh, 0, 0, cw, ch);
-    return { url: cv.toDataURL('image/jpeg', 0.85), w: cw, h: ch };
+    return { url: cv.toDataURL('image/jpeg', 0.95), w: cw, h: ch };
   }
 
   // ---- 关键词预填 ----

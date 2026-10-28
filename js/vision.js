@@ -69,6 +69,8 @@
   }
 
   function callApi(url, key, model, dataUrl) {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 60000) : null;
     return fetch(url, {
       method: 'POST',
       headers: {
@@ -85,7 +87,8 @@
           ]
         }],
         temperature: 0.1
-      })
+      }),
+      signal: ctrl ? ctrl.signal : undefined
     }).then(function (resp) {
       if (!resp.ok) {
         var e = new Error('视觉服务 HTTP ' + resp.status);
@@ -98,6 +101,17 @@
       var text = msg && msg.content;
       if (!text) return null;
       return parseJson(text);
+    }).catch(function (err) {
+      if (err && err.name === 'AbortError') {
+        throw new Error('请求超时（60秒），手机网络上传图片太慢，建议换 WiFi 或光线好的环境');
+      }
+      throw err;
+    }).then(function (data) {
+      if (timer) clearTimeout(timer);
+      return data;
+    }, function (err) {
+      if (timer) clearTimeout(timer);
+      throw err;
     });
   }
 

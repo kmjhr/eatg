@@ -1,0 +1,1347 @@
+{
+  "schemaVersion": "2026.08.06",
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.08.06.19.15.08",
+    "version_source": "skill-release-manifest.json",
+    "release": "prompt-base-cloud-ssot-migration",
+    "read_status": "ok"
+  },
+  "project": {
+    "operation": "create",
+    "resolvedLane": "complex_html_page",
+    "selectedIntentWorkflowRead": true,
+    "contextRequirementsLoaded": [
+      {
+        "path": "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/page-rendering-quality-gate.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/design-artifact-validation.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/delivery-evidence-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-experience-guidelines.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-checkpoint-protocol.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-project-complex-build/start-complex-project-build.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-project-complex-build/00-requirement-and-style-intake.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "intent-workflows/intent-project-complex-build/01-graphic-asset-preparation.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/reference-material-ingestion-rules.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/design-artifact-formats/design-project-file-format.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/orchestration-summary-contract/orchestration-summary-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "skill-release-manifest.json",
+        "readStatus": "loaded",
+        "bodyRead": true
+      }
+    ],
+    "contextReadScope": "complex_html_page lane + reference material ingestion + design project format",
+    "validationRunDiscipline": {
+      "maxFullValidationRuns": 2,
+      "softWarningsTriggerRepair": false,
+      "blockingRepairMode": "targeted-once",
+      "forbiddenRepairTriggers": [
+        "soft-warning-only",
+        "provenance-warning-only",
+        "style-warning-only"
+      ]
+    },
+    "lowValueCallWatchdog": {
+      "applies": true,
+      "noProgressNextAction": "proceed_to_preflight_or_delivery_summary"
+    },
+    "deviceType": "mobile",
+    "projectName": "Ourtone 风格移动端 UI 稿",
+    "designProjectPath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system",
+    "cssPreflightEvidence": {
+      "command": "node c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\.preflight\\preflight.html --title=Preflight --lang=zh-CN --prefix=ourtone",
+      "exitCode": 0,
+      "preflightFile": ".preflight/preflight.html",
+      "success": true
+    },
+    "styleDefinitionBrief": "以 Ourtone 舞台为灵感，轻快多彩的二次元音乐视觉风格，融合一咕谷子收藏的暖黄角色色，输出浅色/深色双模式移动端 UI 稿。",
+    "designRead": "移动端音乐创作舞台与谷子收藏图鉴 / 年轻二次元用户 / 活泼多彩、轻拟物 / 中高密度 / 避免霓虹渐变与彩虹色滥用",
+    "designDials": {
+      "layoutVariance": 4,
+      "motionIntensity": 3,
+      "visualDensity": 3
+    },
+    "sourceAuthorityLock": {
+      "visualAuthority": "user-screenshot",
+      "contentSupplement": "none",
+      "browserObservationRole": "targeted-verification-only",
+      "mayOverrideVisualAuthority": false,
+      "lockedBeforeDispatch": true
+    },
+    "visualQualityCheckpoints": [
+      {
+        "checkpointId": "vq-anchor",
+        "dimension": "visual-anchor",
+        "expected": "舞台页彩色乐器柱与图鉴页角色进度区作为视觉锚点",
+        "evidenceTarget": "pages/stage-light.html#instrument-columns / pages/gallery-light.html#character-progress"
+      },
+      {
+        "checkpointId": "vq-hierarchy",
+        "dimension": "information-hierarchy",
+        "expected": "顶部切换器 > 歌曲信息/角色选择 > 核心内容区 > 播放控制/底部导航",
+        "evidenceTarget": "all pages header > hero > content > chrome"
+      },
+      {
+        "checkpointId": "vq-structure",
+        "dimension": "composition-structure",
+        "expected": "移动单列布局，圆角卡片与柔和阴影，浅色用糖果色渐变，深色用暗红金哥特感",
+        "evidenceTarget": "all pages"
+      },
+      {
+        "checkpointId": "vq-implementation",
+        "dimension": "implementation-strategy",
+        "expected": "CSS 变量驱动双模式，Lucide 图标，CSS 渐变与几何图形还原舞台柱，生成图鉴占位图",
+        "evidenceTarget": "colors_and_type.css + page HTML"
+      }
+    ],
+    "sharedProjectShellContract": {
+      "typographySystem": {
+        "display": "Inter, 'Noto Sans SC', 'PingFang SC', sans-serif",
+        "body": "Inter, 'Noto Sans SC', 'PingFang SC', sans-serif"
+      },
+      "radiusScale": {
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px",
+        "full": "9999px"
+      },
+      "surfaceDepthModel": "static surfaces use border or surface layering; only floating layers use deeper elevation",
+      "primaryColor": "blue",
+      "darkMode": {
+        "bgRange": "#0F0B12 to #1A1218",
+        "text": "#F5F0E8",
+        "surfaceStep": "4-6%"
+      },
+      "mobileNavigation": {
+      "applies": true,
+      "type": "bottom-tab",
+      "items": [
+        {
+          "key": "library",
+          "label": "收藏库",
+          "icon": "box"
+        },
+        {
+          "key": "gallery",
+          "label": "图鉴",
+          "icon": "grid"
+        },
+        {
+          "key": "market",
+          "label": "行情",
+          "icon": "trending-up"
+        },
+        {
+          "key": "news",
+          "label": "资讯",
+          "icon": "newspaper"
+        },
+        {
+          "key": "mine",
+          "label": "我的",
+          "icon": "user"
+        }
+      ],
+      "heightPx": 56,
+      "position": "flow-bottom",
+      "activeState": "primary icon+label color only; geometry stays identical",
+      "structure": {
+        "navTag": "nav",
+        "navClass": "w-full border-t border-[var(--line)] bg-[var(--surface)] h-[56px]",
+        "innerClass": "w-full max-w-md mx-auto grid grid-cols-5 h-full",
+        "itemTag": "a",
+        "itemClass": "min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ink-2)]",
+        "iconClass": "w-5 h-5 shrink-0",
+        "labelClass": "text-[11px] leading-none whitespace-nowrap max-w-full truncate",
+        "activeRule": "only color/font-weight/data-active may change; no class changes that affect layout",
+        "markerAttr": "data-mobile-nav=\"global\"",
+        "canonicalHtmlByKey": {
+          "library": "<a href=\"#\" data-dom-id=\"nav-library\" data-nav-key=\"library\" data-active=\"true\" class=\"min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ourtone-primary)] font-medium\"><i data-lucide=\"box\" class=\"w-5 h-5 shrink-0\"></i><span class=\"text-[11px] leading-none whitespace-nowrap max-w-full truncate\">收藏库</span></a>",
+          "gallery": "<a href=\"#\" data-dom-id=\"nav-gallery\" data-nav-key=\"gallery\" data-active=\"true\" class=\"min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ourtone-primary)] font-medium\"><i data-lucide=\"grid\" class=\"w-5 h-5 shrink-0\"></i><span class=\"text-[11px] leading-none whitespace-nowrap max-w-full truncate\">图鉴</span></a>",
+          "market": "<a href=\"#\" data-dom-id=\"nav-market\" data-nav-key=\"market\" data-active=\"true\" class=\"min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ourtone-primary)] font-medium\"><i data-lucide=\"trending-up\" class=\"w-5 h-5 shrink-0\"></i><span class=\"text-[11px] leading-none whitespace-nowrap max-w-full truncate\">行情</span></a>",
+          "news": "<a href=\"#\" data-dom-id=\"nav-news\" data-nav-key=\"news\" data-active=\"true\" class=\"min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ourtone-primary)] font-medium\"><i data-lucide=\"newspaper\" class=\"w-5 h-5 shrink-0\"></i><span class=\"text-[11px] leading-none whitespace-nowrap max-w-full truncate\">资讯</span></a>",
+          "mine": "<a href=\"#\" data-dom-id=\"nav-mine\" data-nav-key=\"mine\" data-active=\"true\" class=\"min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 h-full text-[var(--ourtone-primary)] font-medium\"><i data-lucide=\"user\" class=\"w-5 h-5 shrink-0\"></i><span class=\"text-[11px] leading-none whitespace-nowrap max-w-full truncate\">我的</span></a>"
+        }
+      }
+    },
+    "generationTree": {
+      "root": {
+        "nodeId": "gen-project-shell",
+        "kind": "project-shell",
+        "pageIds": [
+          "page-style-guide",
+          "page-stage-light",
+          "page-stage-dark",
+          "page-gallery-light",
+          "page-gallery-dark"
+        ],
+        "output": "partials/project-shell.html",
+        "sharedRegions": [
+          "head",
+          "mobile-chrome",
+          "bottom-tab-nav"
+        ],
+        "privateRegions": [],
+        "mutableSlots": [
+          "pageTitle",
+          "pageContent",
+          "bottomNav"
+        ],
+        "status": "planned",
+        "children": [
+          {
+            "nodeId": "page-style-guide",
+            "kind": "page-leaf",
+            "pageIds": [
+              "page-style-guide"
+            ],
+            "output": "pages/style-guide.html",
+            "sharedRegions": [
+              "head",
+              "mobile-chrome",
+              "bottom-tab-nav"
+            ],
+            "privateRegions": [
+              "main"
+            ],
+            "mutableSlots": [
+              "pageTitle",
+              "pageContent"
+            ],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "page-stage-light",
+            "kind": "page-leaf",
+            "pageIds": [
+              "page-stage-light"
+            ],
+            "output": "pages/stage-light.html",
+            "sharedRegions": [
+              "head",
+              "mobile-chrome",
+              "bottom-tab-nav"
+            ],
+            "privateRegions": [
+              "main"
+            ],
+            "mutableSlots": [
+              "pageTitle",
+              "pageContent"
+            ],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "page-stage-dark",
+            "kind": "page-leaf",
+            "pageIds": [
+              "page-stage-dark"
+            ],
+            "output": "pages/stage-dark.html",
+            "sharedRegions": [
+              "head",
+              "mobile-chrome",
+              "bottom-tab-nav"
+            ],
+            "privateRegions": [
+              "main"
+            ],
+            "mutableSlots": [
+              "pageTitle",
+              "pageContent"
+            ],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "page-gallery-light",
+            "kind": "page-leaf",
+            "pageIds": [
+              "page-gallery-light"
+            ],
+            "output": "pages/gallery-light.html",
+            "sharedRegions": [
+              "head",
+              "mobile-chrome",
+              "bottom-tab-nav"
+            ],
+            "privateRegions": [
+              "main"
+            ],
+            "mutableSlots": [
+              "pageTitle",
+              "pageContent"
+            ],
+            "status": "planned",
+            "children": []
+          },
+          {
+            "nodeId": "page-gallery-dark",
+            "kind": "page-leaf",
+            "pageIds": [
+              "page-gallery-dark"
+            ],
+            "output": "pages/gallery-dark.html",
+            "sharedRegions": [
+              "head",
+              "mobile-chrome",
+              "bottom-tab-nav"
+            ],
+            "privateRegions": [
+              "main"
+            ],
+            "mutableSlots": [
+              "pageTitle",
+              "pageContent"
+            ],
+            "status": "planned",
+            "children": []
+          }
+        ]
+      }
+    },
+    "dispatchPreflightManifest": [
+      {
+        "recorded_at": "2026-10-14T14:33:16.079Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-style-guide",
+        "htmlSrc": "pages/style-guide.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/style-guide.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/style-guide.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\" --node-id=\"page-style-guide\" --html-src=\"pages/style-guide.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css",
+        "htmlFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\style-guide.html",
+        "brandPrefix": "ourtone",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\style-guide.html\" --title=\"设计规范拆解\" --lang=\"zh-CN\" --prefix=\"ourtone\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": "document-scroll",
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ourtone-style-system.design": "87f4fc131f563eed9214be2331f4ccfdf5eb9bfd46ce7edacdc50ed444f954a6"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-10-14T14:33:16.079Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-stage-light",
+        "htmlSrc": "pages/stage-light.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/stage-light.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/stage-light.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\" --node-id=\"page-stage-light\" --html-src=\"pages/stage-light.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css",
+        "htmlFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\stage-light.html",
+        "brandPrefix": "ourtone",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\stage-light.html\" --title=\"舞台 - 浅色\" --lang=\"zh-CN\" --prefix=\"ourtone\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": "document-scroll",
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ourtone-style-system.design": "87f4fc131f563eed9214be2331f4ccfdf5eb9bfd46ce7edacdc50ed444f954a6"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-10-14T14:33:16.079Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-stage-dark",
+        "htmlSrc": "pages/stage-dark.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/stage-dark.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/stage-dark.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\" --node-id=\"page-stage-dark\" --html-src=\"pages/stage-dark.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css",
+        "htmlFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\stage-dark.html",
+        "brandPrefix": "ourtone",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\stage-dark.html\" --title=\"舞台 - 深色\" --lang=\"zh-CN\" --prefix=\"ourtone\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": "document-scroll",
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ourtone-style-system.design": "87f4fc131f563eed9214be2331f4ccfdf5eb9bfd46ce7edacdc50ed444f954a6"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-10-14T14:33:16.079Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-gallery-light",
+        "htmlSrc": "pages/gallery-light.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/gallery-light.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/gallery-light.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\" --node-id=\"page-gallery-light\" --html-src=\"pages/gallery-light.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css",
+        "htmlFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\gallery-light.html",
+        "brandPrefix": "ourtone",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\gallery-light.html\" --title=\"图鉴 - 浅色\" --lang=\"zh-CN\" --prefix=\"ourtone\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": "document-scroll",
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ourtone-style-system.design": "87f4fc131f563eed9214be2331f4ccfdf5eb9bfd46ce7edacdc50ed444f954a6"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-10-14T14:33:16.079Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-gallery-dark",
+        "htmlSrc": "pages/gallery-dark.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/gallery-dark.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/gallery-dark.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\" --node-id=\"page-gallery-dark\" --html-src=\"pages/gallery-dark.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css",
+        "htmlFilePath": "d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\gallery-dark.html",
+        "brandPrefix": "ourtone",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\KHRMJ\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\colors_and_type.css\" \"d:\\codex\\codex-data\\GZ\\app\\ourtone-style-system\\pages\\gallery-dark.html\" --title=\"图鉴 - 深色\" --lang=\"zh-CN\" --prefix=\"ourtone\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": "document-scroll",
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ourtone-style-system.design": "87f4fc131f563eed9214be2331f4ccfdf5eb9bfd46ce7edacdc50ed444f954a6"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      }
+    ],
+    "validationHistory": [],
+    "validationRepairLedger": [],
+    "readScopeLedger": [
+      {
+        "actor": "page-sub-agent",
+        "lane": "complex_html_page",
+        "path": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "reason": "page runtime guide",
+        "scopeClass": "page-runtime",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-10-14T14:33:16.079Z",
+        "nodeId": "page-style-guide",
+        "htmlSrc": "pages/style-guide.html"
+      },
+      {
+        "actor": "page-sub-agent",
+        "lane": "complex_html_page",
+        "path": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md",
+        "reason": "dispatch contract",
+        "scopeClass": "dispatch-contract",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-10-14T14:33:16.079Z",
+        "nodeId": "page-style-guide",
+        "htmlSrc": "pages/style-guide.html"
+      }
+    ]
+  },
+  "designSource": {
+    "operatingMode": "free-explore",
+    "cssFilePath": "colors_and_type.css",
+    "brandPrefix": "ourtone",
+    "referenceMaterialAnalysis": {
+      "sources": [
+        "user-screenshot"
+      ],
+      "intent": "style-reference + reconstruct-extend",
+      "designConstraints": {
+        "colorDirection": "浅色：白底 + 浅蓝半调网点背景，糖果色渐变柱（蓝 #5B9BD5、粉 #F5A0C0、绿 #7ED7C1、黄 #FFD966、紫 #B8A9E8），深色：暗红褐底 #2A0A10 + 金/奶油文字 + 哥特拱形彩窗",
+        "layoutPatterns": "顶部 segmented 舞台/录音室切换，左侧歌曲信息区，右侧/下方彩色乐器轨道柱；移动版改为单列：顶部切换 > 歌曲元数据 > 彩色轨道网格 > 播放控制",
+        "typography": "无衬线，大标题粗体（春日影），小标签英文/拼音，数字等宽，深色模式带轻微衬线装饰感",
+        "componentLanguage": "大圆角卡片、胶囊切换器、圆形播放按钮、带图标的功能标签、彩色轨道柱",
+        "density": "中高密度，信息紧凑但留白充足",
+        "tone": "活泼、年轻、二次元音乐感"
+      },
+      "contentToPreserve": [
+        "Ourtone 品牌标",
+        "舞台/录音室切换",
+        "歌曲信息：无声的假面 / 春日影 / MYGO!!!!! / B大调 6/8 97BPM",
+        "乐器轨道：主旋律 MELODY / 吉他 GUITAR / 钢琴 PIANO / 贝斯 BASS / 鼓 DRUMS",
+        "播放控制：播放按钮、时间 00:00/04:20、音符速度",
+        "深色模式哥特彩窗变体"
+      ],
+      "visualSpecExcerpt": "浅色 bg #F8FAFD，surface #FFFFFF，ink #1A1A1A，brand-blue #4A90E2，brand-pink #F5A0C0，brand-green #7ED7C1，brand-yellow #FFD966，brand-purple #B8A9E8；深色 bg #1A0F12，surface #25171A，ink #F5F0E8，card-elevated #332023，gold #D4A853。组件：胶囊切换器 r-full，卡片 r-lg，播放按钮 56px 圆形填充。"
+    },
+    "styleConstraints": {
+      "radiusMax": 16,
+      "staticShadowAlphaMax": 0.05,
+      "singlePrimaryHue": false,
+      "multiHueRationale": "source uses distinct instrument track colors; system maps them to category/accent tints while keeping blue as primary CTA"
+    }
+  },
+  "pages": [
+    {
+      "nodeId": "page-style-guide",
+      "title": "设计规范拆解",
+      "htmlSrc": "pages/style-guide.html",
+      "pageIndex": 1,
+      "pageType": "information-dense",
+      "viewportMode": "document-scroll",
+      "deviceType": "mobile",
+      "visualNorthStar": "把参考图的色板、字体、组件、icon、布局完整拆解为可复用的设计 Token，作为后续页面与系统的视觉基准。",
+      "compositionPattern": "two-tier layout: palette grid + component specimen list",
+      "continuityAnchors": [
+        "顶部胶囊切换器样式",
+        "蓝黄双主色",
+        "圆角卡片系统",
+        "Lucide 线性图标"
+      ],
+      "componentPlan": [],
+      "imagePlan": [],
+      "chartsRequired": false,
+      "miniProgramStyle": false,
+      "mobileNavigationActiveKey": "gallery"
+    },
+    {
+      "nodeId": "page-stage-light",
+      "title": "舞台 - 浅色",
+      "htmlSrc": "pages/stage-light.html",
+      "pageIndex": 2,
+      "pageType": "showcase",
+      "viewportMode": "document-scroll",
+      "deviceType": "mobile",
+      "visualNorthStar": "还原 Ourtone 舞台页为移动端：顶部模式切换、歌曲信息、彩色乐器轨道柱、播放控制，保持浅色糖果渐变风格。",
+      "compositionPattern": "hero + grid of colored instrument tracks + bottom player chrome",
+      "continuityAnchors": [
+        "顶部胶囊切换器",
+        "蓝黄主色",
+        "圆角卡片",
+        "彩色轨道柱"
+      ],
+      "componentPlan": [],
+      "imagePlan": [],
+      "chartsRequired": false,
+      "miniProgramStyle": false,
+      "mobileNavigationActiveKey": "library"
+    },
+    {
+      "nodeId": "page-stage-dark",
+      "title": "舞台 - 深色",
+      "htmlSrc": "pages/stage-dark.html",
+      "pageIndex": 3,
+      "pageType": "showcase",
+      "viewportMode": "document-scroll",
+      "deviceType": "mobile",
+      "visualNorthStar": "深色模式舞台页：暗红褐底色、哥特拱形彩窗乐器轨道、金/奶油文字，保持与浅色相同的结构和信息层级。",
+      "compositionPattern": "hero + grid of cathedral-arched instrument tracks + bottom player chrome",
+      "continuityAnchors": [
+        "顶部胶囊切换器",
+        "金红暗色基调",
+        "哥特拱形卡片",
+        "相同信息层级"
+      ],
+      "componentPlan": [],
+      "imagePlan": [],
+      "chartsRequired": false,
+      "miniProgramStyle": false,
+      "mobileNavigationActiveKey": "library"
+    },
+    {
+      "nodeId": "page-gallery-light",
+      "title": "图鉴 - 浅色",
+      "htmlSrc": "pages/gallery-light.html",
+      "pageIndex": 4,
+      "pageType": "task-driven",
+      "viewportMode": "document-scroll",
+      "deviceType": "mobile",
+      "visualNorthStar": "把一咕 EATG 图鉴页用 Ourtone 浅色风格重设计：角色横滑条、进度卡片、两列图鉴网格、拥有/未拥有三态。",
+      "compositionPattern": "sticky character selector + progress card + 2-col masonry grid",
+      "continuityAnchors": [
+        "底部 5 项 Tab 导航",
+        "暖黄 accent 与角色色标签",
+        "圆角 12px 卡片",
+        "状态角标胶囊"
+      ],
+      "componentPlan": [],
+      "imagePlan": [
+        {
+          "assetId": "image-001",
+          "filename": "merch-badge-a.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 A"
+        },
+        {
+          "assetId": "image-002",
+          "filename": "merch-badge-b.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 B"
+        },
+        {
+          "assetId": "image-003",
+          "filename": "merch-badge-c.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 C"
+        }
+      ],
+      "chartsRequired": false,
+      "miniProgramStyle": false,
+      "mobileNavigationActiveKey": "gallery"
+    },
+    {
+      "nodeId": "page-gallery-dark",
+      "title": "图鉴 - 深色",
+      "htmlSrc": "pages/gallery-dark.html",
+      "pageIndex": 5,
+      "pageType": "task-driven",
+      "viewportMode": "document-scroll",
+      "deviceType": "mobile",
+      "visualNorthStar": "一咕图鉴页深色模式：暗红褐底、金色强调、角色色标签在深色表面上的可访问性、相同网格与状态体系。",
+      "compositionPattern": "sticky character selector + progress card + 2-col masonry grid",
+      "continuityAnchors": [
+        "底部 5 项 Tab 导航",
+        "金色强调与角色色标签",
+        "深色卡片表面层级",
+        "状态角标胶囊"
+      ],
+      "componentPlan": [],
+      "imagePlan": [
+        {
+          "assetId": "image-001",
+          "filename": "merch-badge-a.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 A"
+        },
+        {
+          "assetId": "image-002",
+          "filename": "merch-badge-b.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 B"
+        },
+        {
+          "assetId": "image-003",
+          "filename": "merch-badge-c.jpg",
+          "role": "supporting-content",
+          "section": "product",
+          "usage": "图鉴网格占位商品图 C"
+        }
+      ],
+      "chartsRequired": false,
+      "miniProgramStyle": false,
+      "mobileNavigationActiveKey": "gallery"
+    }
+  ],
+  "assets": [
+    {
+      "id": "image-001",
+      "filename": "merch-badge-a.jpg",
+      "role": "supporting-content",
+      "section": "product",
+      "status": "generated",
+      "ownerPages": [
+        "page-gallery-light",
+        "page-gallery-dark"
+      ]
+    },
+    {
+      "id": "image-002",
+      "filename": "merch-badge-b.jpg",
+      "role": "supporting-content",
+      "section": "product",
+      "status": "generated",
+      "ownerPages": [
+        "page-gallery-light",
+        "page-gallery-dark"
+      ]
+    },
+    {
+      "id": "image-003",
+      "filename": "merch-badge-c.jpg",
+      "role": "supporting-content",
+      "section": "product",
+      "status": "generated",
+      "ownerPages": [
+        "page-gallery-light",
+        "page-gallery-dark"
+      ]
+    }
+  ],
+  "wiringPlan": [
+    {
+      "from": "page-style-guide",
+      "to": "page-stage-light",
+      "domId": "cta-stage",
+      "transitionLabel": "进入舞台"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-stage-dark",
+      "domId": "cta-theme",
+      "transitionLabel": "切换深色主题"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-gallery-light",
+      "domId": "cta-gallery",
+      "transitionLabel": "进入图鉴"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-gallery-dark",
+      "domId": "cta-theme",
+      "transitionLabel": "切换深色主题"
+    }
+  ],
+  "hiddenInteractionPlan": [
+    {
+      "from": "page-style-guide",
+      "to": "page-stage-light",
+      "domId": "nav-library",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-style-guide",
+      "to": "page-gallery-light",
+      "domId": "nav-gallery",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-style-guide",
+      "to": "page-style-guide",
+      "domId": "nav-market",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-style-guide",
+      "to": "page-style-guide",
+      "domId": "nav-news",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-style-guide",
+      "to": "page-style-guide",
+      "domId": "nav-mine",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-stage-light",
+      "domId": "nav-library",
+      "reason": "bottom tab active self"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-gallery-light",
+      "domId": "nav-gallery",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-style-guide",
+      "domId": "nav-market",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-style-guide",
+      "domId": "nav-news",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-light",
+      "to": "page-style-guide",
+      "domId": "nav-mine",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-stage-light",
+      "domId": "back-stage-light",
+      "reason": "back to light theme"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-stage-dark",
+      "domId": "nav-library",
+      "reason": "bottom tab active self"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-gallery-dark",
+      "domId": "nav-gallery",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-style-guide",
+      "domId": "nav-market",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-style-guide",
+      "domId": "nav-news",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-stage-dark",
+      "to": "page-style-guide",
+      "domId": "nav-mine",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-stage-light",
+      "domId": "nav-library",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-gallery-light",
+      "domId": "nav-gallery",
+      "reason": "bottom tab active self"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-style-guide",
+      "domId": "nav-market",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-style-guide",
+      "domId": "nav-news",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-light",
+      "to": "page-style-guide",
+      "domId": "nav-mine",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-gallery-light",
+      "domId": "back-gallery-light",
+      "reason": "back to light theme"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-stage-light",
+      "domId": "nav-library",
+      "reason": "bottom tab"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-gallery-dark",
+      "domId": "nav-gallery",
+      "reason": "bottom tab active self"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-style-guide",
+      "domId": "nav-market",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-style-guide",
+      "domId": "nav-news",
+      "reason": "bottom tab placeholder"
+    },
+    {
+      "from": "page-gallery-dark",
+      "to": "page-style-guide",
+      "domId": "nav-mine",
+      "reason": "bottom tab placeholder"
+    }
+  ]
+}

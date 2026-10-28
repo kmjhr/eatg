@@ -260,6 +260,8 @@
         var file = inp.files && inp.files[0];
         inp.value = '';
         if (!file) return;
+        // 兜底：旧版缓存无图片编辑函数时直接入画布，避免版本不匹配卡死
+        if (!U.importImagesWithEdit) { UI.toast('正在处理图片…', 'info'); loadFile(file); return; }
         UI.toast('正在处理图片（可旋转/裁剪）…');
         U.importImagesWithEdit([file], {
           maxCount: 1,

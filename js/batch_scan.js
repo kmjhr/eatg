@@ -244,14 +244,14 @@
       opts = document.createElement('div');
       opts.className = 'bs-pick-options';
       opts.innerHTML = '<div class="opt-list">' +
-        '<span class="opt-row opt-row--file" data-src="camera">' +
-          '<button type="button" class="opt-row-btn">拍照</button>' +
-          '<input type="file" class="input-cover" accept="image/*" capture="environment">' +
-          '<span class="opt-check">›</span></span>' +
-        '<span class="opt-row opt-row--file" data-src="album">' +
-          '<button type="button" class="opt-row-btn">从相册选择</button>' +
-          '<input type="file" class="input-cover" accept="image/*" multiple>' +
-          '<span class="opt-check">›</span></span>' +
+        '<button type="button" class="opt-row opt-row--file" data-src="camera">' +
+          '<span class="opt-row-btn">拍照</span>' +
+          '<input type="file" style="display:none" accept="image/*" capture="environment">' +
+          '<span class="opt-check">›</span></button>' +
+        '<button type="button" class="opt-row opt-row--file" data-src="album">' +
+          '<span class="opt-row-btn">从相册选择</span>' +
+          '<input type="file" style="display:none" accept="image/*" multiple>' +
+          '<span class="opt-check">›</span></button>' +
         '</div>';
       view.el.appendChild(opts);
       opts.addEventListener('change', function (e) {
@@ -279,8 +279,8 @@
         var row = e.target.closest('.opt-row--file');
         if (!row) return;
         var inp = row.querySelector('input[type=file]');
-        if (!inp || e.target === inp) return;
-        try { inp.click(); } catch (err) { console.error('[EATG] 选图兜底失败', err); }
+        if (!inp) return;
+        try { inp.click(); } catch (err) { console.error('[EATG] 选图触发失败', err); }
       });
     }
     opts.style.display = 'block';

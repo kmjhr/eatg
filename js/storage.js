@@ -67,6 +67,7 @@
     image_quality: 0.8,
     reminder: { preorder_lead: 1, deadline_lead: 1, quiet_start: '22:00', quiet_end: '08:00', enabled: true },
     auto_backup_remind: { enabled: false, period: 'weekly' },
+    vision_api: { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', key: '', model: 'glm-4v-flash' },
     last_backup_at: null,
     custom_options: { ips: [], goods_types: [], channels: [], sale_channels: [], conditions: [] }
   };

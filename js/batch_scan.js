@@ -156,7 +156,7 @@
         '<span class="bs-progress-bar"><i></i></span></div>' +
       '<div class="bs-stage">' +
         '<canvas class="bs-canvas"></canvas>' +
-        '<div class="bs-empty">点下方「相册 / 拍照」选择照片<br><span class="bs-empty-sub">选图后点「自动识别」圈出吊牌/包装文字区，或双击画面手动加框</span></div>' +
+        '<div class="bs-empty">点下方「相册 / 拍照」选择照片<br><span class="bs-empty-sub">选图后点「自动识别」：已配视觉Key自动圈出谷子，否则识别吊牌/包装文字区；也可双击画面手动加框</span></div>' +
       '</div>' +
       '<div class="bs-foot">' +
         '<button type="button" class="btn btn--secondary" data-act="pick">相册 / 拍照</button>' +
@@ -445,46 +445,63 @@
     if (view.busy) return;
     view.busy = true;
     setBusy(true);
-    setProgress('正在准备识别引擎…', 3);
-    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, OCR_MAX_EDGE);
 
-    loadOcr().then(function (worker) {
-      setProgress('正在识别吊牌/包装文字…', 30);
-      return worker.recognize(cut.url);
-    }).then(function (res) {
-      if (!view || view.destroyed) return;
-      var tsv = (res && res.data && res.data.tsv) || '';
-      var regions = regionsFromTsv(tsv, cut.w, cut.h);
+    var cut = cropBox(view.img, { x: 0, y: 0, w: 1, h: 1 }, 1280);
 
-      // 预留：接入自训练物体检测模型（BS.setDetector）后，可额外产出物体框
-      if (!regions.length && view.detector) {
-        return Promise.resolve(view.detector(view.img)).then(function (objs) {
-          (objs || []).forEach(function (o) {
-            if (view.boxes.length >= MAX_BOXES) return;
-            view.boxes.push({ x: o.x, y: o.y, w: o.w, h: o.h, text: null });
-          });
-        });
-      }
-      if (!regions.length) {
-        UI.toast('未识别到文字，可双击画面手动加框', 'info');
-        return;
-      }
-      var prev = view.boxes.length;
-      regions.forEach(function (r) {
-        if (view.boxes.length >= MAX_BOXES) return;
-        view.boxes.push({ x: r.x, y: r.y, w: r.w, h: r.h, text: r.text });
+    // 优先：视觉大模型「数个数 + 给框」（已在设置页配置 Key 时）
+    setProgress('正在调用视觉识别…', 10);
+    Promise.resolve(EATG.vision && EATG.vision.detectBoxes(cut.url) || Promise.reject({ code: 'NO_KEY' }))
+      .then(function (boxes) {
+        if (!view || view.destroyed) return;
+        if (!boxes || !boxes.length) {
+          UI.toast('未圈出谷子，可双击画面手动加框', 'info');
+          return;
+        }
+        view.boxes = boxes.map(function (b) { return { x: b.x, y: b.y, w: b.w, h: b.h, text: null }; });
+        view.useOcr = false;   // 出框模式：不再跑 OCR，名称/IP/类型在确认页自己填
+        view.sel = -1;
+        draw();
+        UI.toast('已自动圈出 ' + view.boxes.length + ' 个谷子，可拖动/缩放修正后点「生成录入」', 'success');
+      })
+      .catch(function (err) {
+        // 回退：本地 OCR 文字区识别（未配 Key 或视觉服务失败时）
+        if (!(err && err.code === 'NO_KEY')) {
+          console.warn('[EATG] 视觉出框失败，回退本地 OCR', err);
+          UI.toast('视觉出框失败，改用本地 OCR 文字识别', 'info');
+        }
+        return ocrFallback();
+      })
+      .then(function () {
+        if (!view || view.destroyed) return;
+        view.busy = false;
+        setBusy(false);
+        setProgress(null);
       });
-      view.sel = -1;
-      draw();
-      UI.toast('已识别 ' + (view.boxes.length - prev) + ' 个文字区（共 ' + view.boxes.length + '/' + MAX_BOXES + '），可拖动/缩放修正', 'success');
-    }).catch(function (err) {
-      console.error('[EATG] 自动识别失败', err);
-      UI.toast('自动识别失败：' + (err && err.message || err), 'error');
-    }).then(function () {
-      view.busy = false;
-      setBusy(false);
-      setProgress(null);
-    });
+
+    function ocrFallback() {
+      setProgress('正在准备识别引擎…', 3);
+      return loadOcr().then(function (worker) {
+        setProgress('正在识别吊牌/包装文字…', 30);
+        return worker.recognize(cut.url);
+      }).then(function (res) {
+        if (!view || view.destroyed) return;
+        var tsv = (res && res.data && res.data.tsv) || '';
+        var regions = regionsFromTsv(tsv, cut.w, cut.h);
+        view.useOcr = true;
+        var prev = view.boxes.length;
+        regions.forEach(function (r) {
+          if (view.boxes.length >= MAX_BOXES) return;
+          view.boxes.push({ x: r.x, y: r.y, w: r.w, h: r.h, text: r.text });
+        });
+        view.sel = -1;
+        draw();
+        if (regions.length) UI.toast('已识别 ' + regions.length + ' 个文字区，可拖动/缩放修正', 'success');
+        else UI.toast('未识别到文字，可双击画面手动加框', 'info');
+      }).catch(function (err2) {
+        console.error('[EATG] 本地 OCR 失败', err2);
+        UI.toast('识别失败：' + (err2 && err2.message || err2), 'error');
+      });
+    }
   }
 
   // ---- 裁剪 ----
@@ -641,7 +658,7 @@
       el: el, canvas: el.querySelector('.bs-canvas'), boxes: [], sel: -1,
       img: null, fit: null, destroyed: false, busy: false,
       characters: [], enums: { ip: [], goods_type: [] },
-      detector: null, useOcr: true, _handlers: null
+      detector: BS._detector, useOcr: true, _handlers: null
     };
     view.ctx = view.canvas.getContext('2d');
 

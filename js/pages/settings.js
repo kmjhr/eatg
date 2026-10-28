@@ -33,6 +33,7 @@
       exchange_rate: DEFAULTS.exchange_rate,
       reminder: DEFAULTS.reminder,
       image_quality: DEFAULTS.image_quality,
+      vision_api: DEFAULTS.vision_api,
       imageStats: { count: 0, bytes: 0 }
     };
   }
@@ -44,6 +45,7 @@
       S.getSetting('exchange_rate'),
       S.getSetting('reminder'),
       S.getSetting('image_quality'),
+      S.getSetting('vision_api'),
       S.getAll('goods')
     ]).then(function (r) {
       state.theme = r[0] || 'auto';
@@ -51,8 +53,9 @@
       state.exchange_rate = r[2] || DEFAULTS.exchange_rate;
       state.reminder = r[3] || DEFAULTS.reminder;
       state.image_quality = r[4] != null ? r[4] : DEFAULTS.image_quality;
+      state.vision_api = r[5] || DEFAULTS.vision_api;
       // 图片占用统计：所有 goods.images 的 base64 长度估算
-      var goods = r[5] || [];
+      var goods = r[6] || [];
       var count = 0, bytes = 0;
       goods.forEach(function (g) {
         var imgs = g.images || [];
@@ -146,6 +149,22 @@
       '</div>';
   }
 
+  function visionBody() {
+    var v = state.vision_api || {};
+    return rowHTML('识别服务地址',
+      '<input id="stg-vis-url" type="text" class="input" value="' + esc(v.url || '') + '">',
+      '默认智谱 BigModel；有自建代理可改地址') +
+      rowHTML('API Key',
+        '<input id="stg-vis-key" type="password" class="input" value="' + esc(v.key || '') + '" placeholder="仅存本机浏览器">',
+        '拍照批量录入时「自动识别」用它给谷子出框；留空则回退本地 OCR') +
+      rowHTML('模型名',
+        '<input id="stg-vis-model" type="text" class="input" value="' + esc(v.model || '') + '">',
+        '默认 glm-4v-flash（智谱免费档）') +
+      '<div class="stg-actions">' +
+        '<button id="stg-vis-save" type="button" class="btn btn--primary">保存视觉识别设置</button>' +
+      '</div>';
+  }
+
   function imageBody() {
     var q = state.image_quality;
     return rowHTML('图片占用',
@@ -189,6 +208,7 @@
       groupHTML('币种', currencyBody()) +
       groupHTML('汇率', exchangeBody()) +
       groupHTML('提醒', reminderBody()) +
+      groupHTML('视觉识别', visionBody()) +
       groupHTML('图片', imageBody()) +
       groupHTML('其他', linksBody()) +
     '</div>';
@@ -227,6 +247,18 @@
     S.setSetting('reminder', r).then(function () {
       state.reminder = r;
       UI.toast('提醒设置已保存', 'success');
+    }).catch(function (err) { UI.toast('保存失败：' + err.message, 'error'); });
+  }
+
+  function saveVision() {
+    var v = {
+      url: (document.getElementById('stg-vis-url') || {}).value || '',
+      key: (document.getElementById('stg-vis-key') || {}).value || '',
+      model: (document.getElementById('stg-vis-model') || {}).value || ''
+    };
+    S.setSetting('vision_api', v).then(function () {
+      state.vision_api = v;
+      UI.toast('视觉识别设置已保存', 'success');
     }).catch(function (err) { UI.toast('保存失败：' + err.message, 'error'); });
   }
 
@@ -300,6 +332,7 @@
 
     on(document.getElementById('stg-rate-save'), 'click', saveRate);
     on(document.getElementById('stg-rem-save'), 'click', saveReminder);
+    on(document.getElementById('stg-vis-save'), 'click', saveVision);
     on(document.getElementById('stg-img-save'), 'click', saveImageQuality);
     on(document.getElementById('stg-img-clean'), 'click', cleanImages);
   }

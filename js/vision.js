@@ -12,7 +12,7 @@
 
   var DEFAULTS = {
     url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    model: 'glm-4v-flash',
+    model: 'glm-4.6v-flash',
     key: ''
   };
 

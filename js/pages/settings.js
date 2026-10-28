@@ -159,7 +159,7 @@
         '拍照批量录入时「自动识别」用它给谷子出框；留空则回退本地 OCR') +
       rowHTML('模型名',
         '<input id="stg-vis-model" type="text" class="input" value="' + esc(v.model || '') + '">',
-        '默认 glm-4v-flash（智谱免费档）') +
+        '默认 glm-4.6v-flash（智谱免费档）') +
       '<div class="stg-actions">' +
         '<button id="stg-vis-save" type="button" class="btn btn--primary">保存视觉识别设置</button>' +
       '</div>';

@@ -457,9 +457,11 @@
       })
       .catch(function (err) {
         // 回退：本地 OCR 文字区识别（未配 Key 或视觉服务失败时）
-        if (!(err && err.code === 'NO_KEY')) {
+        if (err && err.code === 'NO_KEY') {
+          UI.toast('未配视觉识别 Key：当前只能本地识别吊牌文字，数不了吧唧。去「我的 → 设置 → 视觉识别」填 Key 后才能自动数谷子', 'info', 4500);
+        } else {
           console.warn('[EATG] 视觉出框失败，回退本地 OCR', err);
-          UI.toast('视觉出框失败，改用本地 OCR 文字识别', 'info');
+          UI.toast('视觉出框失败（' + (err && err.message || '未知') + '），改用本地 OCR 文字识别', 'info', 3500);
         }
         return ocrFallback();
       })
